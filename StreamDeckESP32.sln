@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamDeck.Domain.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamDeck.Infrastructure.Tests", "tests\StreamDeck.Infrastructure.Tests\StreamDeck.Infrastructure.Tests.csproj", "{6104B456-5594-4985-8B3E-2FCEBC80878B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StreamDeck.Application.Tests", "tests\StreamDeck.Application.Tests\StreamDeck.Application.Tests.csproj", "{907D91E4-D03E-4CC9-837D-7E635B8ECED0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -115,6 +117,18 @@ Global
 		{6104B456-5594-4985-8B3E-2FCEBC80878B}.Release|x64.Build.0 = Release|Any CPU
 		{6104B456-5594-4985-8B3E-2FCEBC80878B}.Release|x86.ActiveCfg = Release|Any CPU
 		{6104B456-5594-4985-8B3E-2FCEBC80878B}.Release|x86.Build.0 = Release|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Debug|x64.Build.0 = Debug|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Debug|x86.Build.0 = Debug|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Release|x64.ActiveCfg = Release|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Release|x64.Build.0 = Release|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Release|x86.ActiveCfg = Release|Any CPU
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -127,5 +141,6 @@ Global
 		{3AE06F12-514D-432E-9BD1-C5E4C067ACCC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{DA64470E-2F12-496A-ABF2-612B36BDD360} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{6104B456-5594-4985-8B3E-2FCEBC80878B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{907D91E4-D03E-4CC9-837D-7E635B8ECED0} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
