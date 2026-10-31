@@ -60,6 +60,48 @@ public sealed class Profile
         return profile;
     }
 
+    public static Profile Reconstitute(
+        Guid id,
+        string name,
+        IEnumerable<(Guid Id, string Name, IEnumerable<int> SlotPositions)> pages)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("El id del perfil no puede estar vacío.", nameof(id));
+        }
+
+        ArgumentNullException.ThrowIfNull(pages);
+
+        var pageList = pages.ToList();
+
+        if (pageList.Count == 0)
+        {
+            throw new ArgumentException("Un perfil debe tener al menos una página.", nameof(pages));
+        }
+
+        var seenIds = new HashSet<Guid>();
+        var reconstitutedPages = new List<Page>(pageList.Count);
+
+        foreach (var (pageId, pageName, slotPositions) in pageList)
+        {
+            if (pageId == Guid.Empty)
+            {
+                throw new ArgumentException("El id de una página no puede estar vacío.", nameof(pages));
+            }
+
+            if (!seenIds.Add(pageId))
+            {
+                throw new ArgumentException($"El id de página '{pageId}' está duplicado.", nameof(pages));
+            }
+
+            reconstitutedPages.Add(Page.Reconstitute(pageId, pageName, slotPositions));
+        }
+
+        var profile = new Profile(id, NormalizeName(name));
+        profile._pages.AddRange(reconstitutedPages);
+        return profile;
+    }
+
     public void Rename(string name)
     {
         Name = NormalizeName(name);
