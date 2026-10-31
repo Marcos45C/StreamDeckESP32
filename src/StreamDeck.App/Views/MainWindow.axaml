@@ -1,0 +1,170 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StreamDeck.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="650"
+        x:Class="StreamDeck.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="StreamDeck ESP32"
+        Width="1100" Height="650"
+        MinWidth="760" MinHeight="480"
+        CanResize="True">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#18181B" />
+        <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#1E1E22" />
+        <SolidColorBrush x:Key="TopBarBackgroundBrush" Color="#202024" />
+        <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#1C1C1F" />
+        <SolidColorBrush x:Key="ActiveItemBackgroundBrush" Color="#22262B" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#2B2B30" />
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E4E4E7" />
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8E8E96" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#5B8DEF" />
+        <SolidColorBrush x:Key="StatusDisconnectedBrush" Color="#6B6B70" />
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="TextBlock.SectionLabel">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="LetterSpacing" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.EmptyStateTitle">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.EmptyStateMessage">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </Window.Styles>
+
+    <Grid Background="{StaticResource WindowBackgroundBrush}"
+          ColumnDefinitions="210,*">
+
+        <!-- A. Barra lateral izquierda -->
+        <Border Grid.Column="0"
+                Background="{StaticResource SidebarBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,24,20,20">
+
+                <StackPanel Grid.Row="0" Spacing="2">
+                    <TextBlock Text="{Binding AppName}"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="Panel de control" Classes="SectionLabel" />
+                </StackPanel>
+
+                <!-- Sección actual (única disponible por ahora) -->
+                <Border Grid.Row="1"
+                        Margin="0,28,0,0"
+                        Background="{StaticResource ActiveItemBackgroundBrush}"
+                        CornerRadius="6"
+                        Padding="10,8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Rectangle Width="3" Height="16"
+                                   RadiusX="1.5" RadiusY="1.5"
+                                   Fill="{StaticResource AccentBrush}" />
+                        <TextBlock Text="{Binding CurrentSectionName}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontSize="13"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Grid.Row="2" vacío a propósito: zona reservada para futura navegación -->
+
+                <Border Grid.Row="3"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="0,12,0,0">
+                    <TextBlock Text="Más secciones próximamente"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="11"
+                               TextWrapping="Wrap" />
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <!-- Columna derecha: barra superior + (centro + panel derecho) -->
+        <Grid Grid.Column="1" RowDefinitions="56,*">
+
+            <!-- B. Barra superior -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource TopBarBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto" Margin="24,0">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding CurrentSectionName}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontSize="14"
+                               FontWeight="Medium"
+                               VerticalAlignment="Center" />
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8"
+                                 Fill="{StaticResource StatusDisconnectedBrush}" />
+                        <TextBlock Text="{Binding DeviceStatusText}"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="12.5" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" ColumnDefinitions="*,260">
+
+                <!-- C. Área central -->
+                <Border Grid.Column="0" Padding="40">
+                    <StackPanel VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Spacing="8"
+                                MaxWidth="360">
+                        <TextBlock Text="{Binding CenterEmptyStateTitle}"
+                                   Classes="EmptyStateTitle" />
+                        <TextBlock Text="{Binding CenterEmptyStateMessage}"
+                                   Classes="EmptyStateMessage" />
+                    </StackPanel>
+                </Border>
+
+                <!-- D. Panel derecho -->
+                <Border Grid.Column="1"
+                        Background="{StaticResource PanelBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1,0,0,0">
+                    <StackPanel VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Margin="20"
+                                Spacing="6">
+                        <TextBlock Text="{Binding PropertiesEmptyStateTitle}"
+                                   Classes="EmptyStateTitle"
+                                   FontSize="13" />
+                        <TextBlock Text="{Binding PropertiesEmptyStateMessage}"
+                                   Classes="EmptyStateMessage" />
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+        </Grid>
+    </Grid>
+
+</Window>

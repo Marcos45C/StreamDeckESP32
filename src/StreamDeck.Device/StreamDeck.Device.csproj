@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\StreamDeck.Application\StreamDeck.Application.csproj" />
+    <ProjectReference Include="..\StreamDeck.Domain\StreamDeck.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+</Project>
