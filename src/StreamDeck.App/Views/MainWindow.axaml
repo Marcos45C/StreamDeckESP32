@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:StreamDeck.App.ViewModels"
+        xmlns:entities="using:StreamDeck.Domain.Entities"
+        xmlns:conv="using:Avalonia.Data.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="650"
@@ -11,10 +13,6 @@
         Width="1100" Height="650"
         MinWidth="760" MinHeight="480"
         CanResize="True">
-
-    <Design.DataContext>
-        <vm:MainViewModel />
-    </Design.DataContext>
 
     <Window.Resources>
         <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#18181B" />
@@ -27,6 +25,7 @@
         <SolidColorBrush x:Key="TextSecondaryBrush" Color="#8E8E96" />
         <SolidColorBrush x:Key="AccentBrush" Color="#5B8DEF" />
         <SolidColorBrush x:Key="StatusDisconnectedBrush" Color="#6B6B70" />
+        <SolidColorBrush x:Key="DangerTextBrush" Color="#E88A8A" />
     </Window.Resources>
 
     <Window.Styles>
@@ -50,6 +49,25 @@
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
+        <Style Selector="Button.SidebarAction">
+            <Setter Property="Background" Value="{StaticResource ActiveItemBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="{StaticResource ActiveItemBackgroundBrush}" />
+        </Style>
+        <Style Selector="ListBoxItem:pointerover">
+            <Setter Property="Background" Value="#202024" />
+        </Style>
     </Window.Styles>
 
     <Grid Background="{StaticResource WindowBackgroundBrush}"
@@ -60,8 +78,9 @@
                 Background="{StaticResource SidebarBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20,24,20,20">
+            <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="20,24,20,20">
 
+                <!-- Encabezado -->
                 <StackPanel Grid.Row="0" Spacing="2">
                     <TextBlock Text="{Binding AppName}"
                                FontSize="16"
@@ -70,29 +89,87 @@
                     <TextBlock Text="Panel de control" Classes="SectionLabel" />
                 </StackPanel>
 
-                <!-- Sección actual (única disponible por ahora) -->
-                <Border Grid.Row="1"
-                        Margin="0,28,0,0"
-                        Background="{StaticResource ActiveItemBackgroundBrush}"
-                        CornerRadius="6"
-                        Padding="10,8">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Rectangle Width="3" Height="16"
-                                   RadiusX="1.5" RadiusY="1.5"
-                                   Fill="{StaticResource AccentBrush}" />
-                        <TextBlock Text="{Binding CurrentSectionName}"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                   FontSize="13"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
+                <!-- Sección PERFILES + botón crear -->
+                <Grid Grid.Row="1" Margin="0,28,0,0" ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="PERFILES"
+                               Classes="SectionLabel"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1"
+                            Content="+"
+                            Command="{Binding CreateProfileCommand}"
+                            Width="22" Height="22"
+                            Padding="0"
+                            FontSize="14"
+                            FontWeight="Bold"
+                            CornerRadius="4"
+                            Background="{StaticResource ActiveItemBackgroundBrush}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            BorderThickness="0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            ToolTip.Tip="Crear perfil" />
+                </Grid>
 
-                <!-- Grid.Row="2" vacío a propósito: zona reservada para futura navegación -->
+                <!-- Indicador de carga -->
+                <TextBlock Grid.Row="2"
+                           Text="Cargando perfiles…"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="12"
+                           Margin="0,12,0,0"
+                           IsVisible="{Binding IsLoading}" />
 
-                <Border Grid.Row="3"
+                <!-- Lista de perfiles -->
+                <ListBox Grid.Row="2"
+                         ItemsSource="{Binding Profiles}"
+                         SelectedItem="{Binding SelectedProfile}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="0"
+                         Margin="0,8,0,0"
+                         IsVisible="{Binding !IsLoading}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="entities:Profile">
+                            <TextBlock Text="{Binding Name}"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontSize="13"
+                                       Padding="10,8" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Acciones sobre el perfil seleccionado -->
+                <StackPanel Grid.Row="3"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            Margin="0,8,0,0">
+                    <Button Content="Renombrar"
+                            Command="{Binding RenameProfileCommand}"
+                            Classes="SidebarAction"
+                            HorizontalAlignment="Stretch" />
+                    <Button Content="Eliminar"
+                            Command="{Binding DeleteProfileCommand}"
+                            Classes="SidebarAction"
+                            Background="#2E2125"
+                            Foreground="{StaticResource DangerTextBrush}"
+                            HorizontalAlignment="Stretch" />
+                </StackPanel>
+
+                <!-- Mensaje de error -->
+                <TextBlock Grid.Row="4"
+                           Text="{Binding ErrorMessage}"
+                           Foreground="{StaticResource DangerTextBrush}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Zona reservada para futura navegación -->
+                <Border Grid.Row="5"
                         BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="0,1,0,0"
-                        Padding="0,12,0,0">
+                        Padding="0,12,0,0"
+                        Margin="0,12,0,0">
                     <TextBlock Text="Más secciones próximamente"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                FontSize="11"
