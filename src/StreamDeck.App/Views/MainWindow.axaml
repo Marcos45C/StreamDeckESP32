@@ -68,19 +68,31 @@
         <Style Selector="ListBoxItem:pointerover">
             <Setter Property="Background" Value="#202024" />
         </Style>
+        <Style Selector="TabStripItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="CornerRadius" Value="6,6,0,0" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+        </Style>
+        <Style Selector="TabStripItem:selected">
+            <Setter Property="Background" Value="{StaticResource ActiveItemBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+        <Style Selector="TabStripItem:pointerover">
+            <Setter Property="Background" Value="#202024" />
+        </Style>
     </Window.Styles>
 
     <Grid Background="{StaticResource WindowBackgroundBrush}"
           ColumnDefinitions="210,*">
 
-        <!-- A. Barra lateral izquierda -->
+        <!-- A. Barra lateral izquierda (sin cambios respecto a la Etapa 6.1) -->
         <Border Grid.Column="0"
                 Background="{StaticResource SidebarBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,1,0">
             <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="20,24,20,20">
 
-                <!-- Encabezado -->
                 <StackPanel Grid.Row="0" Spacing="2">
                     <TextBlock Text="{Binding AppName}"
                                FontSize="16"
@@ -89,7 +101,6 @@
                     <TextBlock Text="Panel de control" Classes="SectionLabel" />
                 </StackPanel>
 
-                <!-- Sección PERFILES + botón crear -->
                 <Grid Grid.Row="1" Margin="0,28,0,0" ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0"
                                Text="PERFILES"
@@ -111,7 +122,6 @@
                             ToolTip.Tip="Crear perfil" />
                 </Grid>
 
-                <!-- Indicador de carga -->
                 <TextBlock Grid.Row="2"
                            Text="Cargando perfiles…"
                            Foreground="{StaticResource TextSecondaryBrush}"
@@ -119,7 +129,6 @@
                            Margin="0,12,0,0"
                            IsVisible="{Binding IsLoading}" />
 
-                <!-- Lista de perfiles -->
                 <ListBox Grid.Row="2"
                          ItemsSource="{Binding Profiles}"
                          SelectedItem="{Binding SelectedProfile}"
@@ -138,7 +147,6 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <!-- Acciones sobre el perfil seleccionado -->
                 <StackPanel Grid.Row="3"
                             Orientation="Horizontal"
                             Spacing="8"
@@ -155,7 +163,6 @@
                             HorizontalAlignment="Stretch" />
                 </StackPanel>
 
-                <!-- Mensaje de error -->
                 <TextBlock Grid.Row="4"
                            Text="{Binding ErrorMessage}"
                            Foreground="{StaticResource DangerTextBrush}"
@@ -164,7 +171,6 @@
                            Margin="0,8,0,0"
                            IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
-                <!-- Zona reservada para futura navegación -->
                 <Border Grid.Row="5"
                         BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="0,1,0,0"
@@ -182,7 +188,7 @@
         <!-- Columna derecha: barra superior + (centro + panel derecho) -->
         <Grid Grid.Column="1" RowDefinitions="56,*">
 
-            <!-- B. Barra superior -->
+            <!-- B. Barra superior (sin cambios) -->
             <Border Grid.Row="0"
                     Background="{StaticResource TopBarBackgroundBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
@@ -210,20 +216,95 @@
 
             <Grid Grid.Row="1" ColumnDefinitions="*,260">
 
-                <!-- C. Área central -->
-                <Border Grid.Column="0" Padding="40">
-                    <StackPanel VerticalAlignment="Center"
-                                HorizontalAlignment="Center"
-                                Spacing="8"
-                                MaxWidth="360">
-                        <TextBlock Text="{Binding CenterEmptyStateTitle}"
-                                   Classes="EmptyStateTitle" />
-                        <TextBlock Text="{Binding CenterEmptyStateMessage}"
-                                   Classes="EmptyStateMessage" />
-                    </StackPanel>
+                <!-- C. Área central: ahora con administración de páginas -->
+                <Border Grid.Column="0">
+                    <Grid>
+
+                        <!-- Estado: sin perfil seleccionado -->
+                        <StackPanel IsVisible="{Binding !HasSelectedProfile}"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Spacing="8"
+                                    MaxWidth="360">
+                            <TextBlock Text="{Binding CenterEmptyStateTitle}" Classes="EmptyStateTitle" />
+                            <TextBlock Text="{Binding CenterEmptyStateMessage}" Classes="EmptyStateMessage" />
+                        </StackPanel>
+
+                        <!-- Estado: perfil seleccionado -> administración de páginas -->
+                        <Grid IsVisible="{Binding HasSelectedProfile}"
+                              RowDefinitions="Auto,Auto,*"
+                              Margin="24">
+
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                <ScrollViewer Grid.Column="0"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Disabled">
+                                    <TabStrip ItemsSource="{Binding Pages}"
+                                              SelectedItem="{Binding SelectedPage}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Padding="0">
+                                        <TabStrip.ItemTemplate>
+                                            <DataTemplate x:DataType="entities:Page">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" Padding="14,8" />
+                                            </DataTemplate>
+                                        </TabStrip.ItemTemplate>
+                                    </TabStrip>
+                                </ScrollViewer>
+
+                                <Button Grid.Column="1"
+                                        Content="+"
+                                        Command="{Binding CreatePageCommand}"
+                                        Width="28" Height="28"
+                                        Padding="0"
+                                        FontSize="14"
+                                        FontWeight="Bold"
+                                        CornerRadius="4"
+                                        Background="{StaticResource ActiveItemBackgroundBrush}"
+                                        Foreground="{StaticResource TextPrimaryBrush}"
+                                        BorderThickness="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        Margin="8,0,0,0"
+                                        ToolTip.Tip="Crear página" />
+                            </Grid>
+
+                            <StackPanel Grid.Row="1"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Margin="0,12,0,0">
+                                <Button Content="Renombrar"
+                                        Command="{Binding RenamePageCommand}"
+                                        Classes="SidebarAction" />
+                                <Button Content="Eliminar"
+                                        Command="{Binding RemovePageCommand}"
+                                        Classes="SidebarAction"
+                                        Background="#2E2125"
+                                        Foreground="{StaticResource DangerTextBrush}" />
+                                <Button Content="←"
+                                        Command="{Binding MovePageLeftCommand}"
+                                        Classes="SidebarAction"
+                                        Width="32" />
+                                <Button Content="→"
+                                        Command="{Binding MovePageRightCommand}"
+                                        Classes="SidebarAction"
+                                        Width="32" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        Spacing="8"
+                                        MaxWidth="360">
+                                <TextBlock Text="{Binding PageEmptyStateTitle}" Classes="EmptyStateTitle" />
+                                <TextBlock Text="{Binding PageEmptyStateMessage}" Classes="EmptyStateMessage" />
+                            </StackPanel>
+
+                        </Grid>
+                    </Grid>
                 </Border>
 
-                <!-- D. Panel derecho -->
+                <!-- D. Panel derecho (sin cambios) -->
                 <Border Grid.Column="1"
                         Background="{StaticResource PanelBackgroundBrush}"
                         BorderBrush="{StaticResource BorderBrush}"

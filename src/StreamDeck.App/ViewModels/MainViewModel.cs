@@ -41,6 +41,11 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(CreateProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(RenameProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreatePageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RenamePageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RemovePageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -49,25 +54,30 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RenameProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreatePageCommand))]
     public partial Profile? SelectedProfile { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RenamePageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RemovePageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
+    public partial Page? SelectedPage { get; set; }
 
     [ObservableProperty]
     public partial string? ErrorMessage { get; set; }
 
     public ObservableCollection<Profile> Profiles { get; } = new();
 
-    /// <summary>
-    /// La View (MainWindow.axaml.cs) asigna esta función para mostrar un diálogo de
-    /// texto real. Recibe el nombre actual (null si es creación) y devuelve el nombre
-    /// ingresado, o null si se canceló.
-    /// </summary>
+    public ObservableCollection<Page> Pages { get; } = new();
+
     public Func<string?, Task<string?>>? RequestProfileNameAsync { get; set; }
 
-    /// <summary>
-    /// La View asigna esta función para mostrar un diálogo de confirmación real.
-    /// Devuelve true si el usuario confirmó.
-    /// </summary>
+    public Func<string?, Task<string?>>? RequestPageNameAsync { get; set; }
+
     public Func<string, Task<bool>>? RequestConfirmationAsync { get; set; }
+
+    public bool HasSelectedProfile => SelectedProfile is not null;
 
     public string CenterEmptyStateTitle => SelectedProfile is not null
         ? $"Perfil: {SelectedProfile.Name}"
@@ -80,6 +90,15 @@ public partial class MainViewModel : ViewModelBase
         : HasProfiles
             ? "Elegí un perfil de la lista en la barra lateral."
             : "Creá tu primer perfil con el botón + de la barra lateral para empezar.";
+
+    public string PageEmptyStateTitle => SelectedPage is not null
+        ? $"Página: {SelectedPage.Name}"
+        : "Seleccioná una página";
+
+    public string PageEmptyStateMessage =>
+        "La distribución de botones se incorporará en una próxima etapa.";
+
+    // ---------- Perfiles (sin cambios respecto a la Etapa 6.1 corregida) ----------
 
     [RelayCommand]
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
@@ -121,7 +140,6 @@ public partial class MainViewModel : ViewModelBase
 
         if (name is null)
         {
-            // El usuario canceló el diálogo.
             return;
         }
 
@@ -155,7 +173,6 @@ public partial class MainViewModel : ViewModelBase
 
         if (newName is null)
         {
-            // El usuario canceló el diálogo.
             return;
         }
 
@@ -209,6 +226,173 @@ public partial class MainViewModel : ViewModelBase
 
     private bool CanOperateOnSelectedProfile() => !IsBusy && SelectedProfile is not null;
 
+    // ---------- Páginas (nuevo en esta etapa) ----------
+
+    [RelayCommand(CanExecute = nameof(CanCreatePage))]
+    private async Task CreatePageAsync()
+    {
+        if (SelectedProfile is null || RequestPageNameAsync is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var name = await RequestPageNameAsync(null);
+
+        if (name is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            ErrorMessage = "El nombre de la página es obligatorio.";
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            var newPage = await _profileService.AddPageAsync(profileId, name, CancellationToken.None);
+            await RefreshProfilesAsync(profileId);
+            SelectedPage = Pages.FirstOrDefault(p => p.Id == newPage.Id);
+        }, "No se pudo crear la página");
+    }
+
+    private bool CanCreatePage() => !IsBusy && SelectedProfile is not null;
+
+    [RelayCommand(CanExecute = nameof(CanOperateOnSelectedPage))]
+    private async Task RenamePageAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || RequestPageNameAsync is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var newName = await RequestPageNameAsync(SelectedPage.Name);
+
+        if (newName is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            ErrorMessage = "El nombre de la página es obligatorio.";
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.RenamePageAsync(profileId, pageId, newName, CancellationToken.None);
+            await RefreshProfilesAsync(profileId);
+            SelectedPage = Pages.FirstOrDefault(p => p.Id == pageId);
+        }, "No se pudo renombrar la página");
+    }
+
+    private bool CanOperateOnSelectedPage() => !IsBusy && SelectedPage is not null;
+
+    [RelayCommand(CanExecute = nameof(CanRemoveSelectedPage))]
+    private async Task RemovePageAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageToRemove = SelectedPage;
+        var indexBeforeRemoval = Pages.IndexOf(pageToRemove);
+
+        if (RequestConfirmationAsync is null)
+        {
+            ErrorMessage = "No se pudo abrir el diálogo de confirmación. La página no fue eliminada.";
+            return;
+        }
+
+        var confirmed = await RequestConfirmationAsync(
+            $"¿Eliminar la página \"{pageToRemove.Name}\"? Esta acción no se puede deshacer.");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.RemovePageAsync(profileId, pageToRemove.Id, CancellationToken.None);
+            await RefreshProfilesAsync(profileId);
+
+            var neighborIndex = Math.Min(indexBeforeRemoval, Pages.Count - 1);
+            SelectedPage = neighborIndex >= 0 ? Pages[neighborIndex] : null;
+        }, "No se pudo eliminar la página");
+    }
+
+    private bool CanRemoveSelectedPage() => !IsBusy && SelectedPage is not null && Pages.Count > 1;
+
+    [RelayCommand(CanExecute = nameof(CanMoveSelectedPageLeft))]
+    private async Task MovePageLeftAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var currentIndex = Pages.IndexOf(SelectedPage);
+
+        if (currentIndex <= 0)
+        {
+            return;
+        }
+
+        var newIndex = currentIndex - 1;
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.ReorderPageAsync(profileId, pageId, newIndex, CancellationToken.None);
+            await RefreshProfilesAsync(profileId);
+            SelectedPage = Pages.FirstOrDefault(p => p.Id == pageId);
+        }, "No se pudo mover la página");
+    }
+
+    private bool CanMoveSelectedPageLeft() =>
+        !IsBusy && SelectedPage is not null && Pages.IndexOf(SelectedPage) > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMoveSelectedPageRight))]
+    private async Task MovePageRightAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var currentIndex = Pages.IndexOf(SelectedPage);
+
+        if (currentIndex < 0 || currentIndex >= Pages.Count - 1)
+        {
+            return;
+        }
+
+        var newIndex = currentIndex + 1;
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.ReorderPageAsync(profileId, pageId, newIndex, CancellationToken.None);
+            await RefreshProfilesAsync(profileId);
+            SelectedPage = Pages.FirstOrDefault(p => p.Id == pageId);
+        }, "No se pudo mover la página");
+    }
+
+    private bool CanMoveSelectedPageRight() =>
+        !IsBusy && SelectedPage is not null && Pages.IndexOf(SelectedPage) < Pages.Count - 1;
+
+    // ---------- Helpers compartidos ----------
+
     private async Task RunExclusiveAsync(Func<Task> operation, string errorPrefix)
     {
         if (IsBusy)
@@ -249,15 +433,50 @@ public partial class MainViewModel : ViewModelBase
         HasProfiles = Profiles.Count > 0;
     }
 
+    /// <summary>
+    /// Recarga todos los perfiles y vuelve a seleccionar el indicado por id, garantizando
+    /// que SelectedProfile sea la misma instancia que la lista Profiles (necesario para que
+    /// la selección visual del ListBox de perfiles se mantenga correcta). Usado exclusivamente
+    /// por las operaciones de páginas.
+    /// </summary>
+    private async Task RefreshProfilesAsync(Guid profileIdToReselect)
+    {
+        var all = await _profileService.GetAllProfilesAsync(CancellationToken.None);
+        ReplaceProfiles(all);
+        SelectedProfile = Profiles.FirstOrDefault(p => p.Id == profileIdToReselect);
+    }
+
+    private void SyncPagesFromSelectedProfile()
+    {
+        Pages.Clear();
+
+        if (SelectedProfile is not null)
+        {
+            foreach (var page in SelectedProfile.Pages)
+            {
+                Pages.Add(page);
+            }
+        }
+
+        SelectedPage = Pages.FirstOrDefault();
+    }
+
     partial void OnSelectedProfileChanged(Profile? value)
     {
         OnPropertyChanged(nameof(CenterEmptyStateTitle));
         OnPropertyChanged(nameof(CenterEmptyStateMessage));
+        OnPropertyChanged(nameof(HasSelectedProfile));
+        SyncPagesFromSelectedProfile();
     }
 
     partial void OnHasProfilesChanged(bool value)
     {
         OnPropertyChanged(nameof(CenterEmptyStateTitle));
         OnPropertyChanged(nameof(CenterEmptyStateMessage));
+    }
+
+    partial void OnSelectedPageChanged(Page? value)
+    {
+        OnPropertyChanged(nameof(PageEmptyStateTitle));
     }
 }

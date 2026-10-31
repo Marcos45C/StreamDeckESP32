@@ -6,9 +6,11 @@ namespace StreamDeck.App.Views;
 
 public partial class ProfileNameDialog : Window
 {
-    public ProfileNameDialog(string? initialName = null)
+    public ProfileNameDialog(string? initialName = null, string title = "Nombre del perfil")
     {
         InitializeComponent();
+        Title = title;
+        PromptTextBlock.Text = title;
         NameTextBox.Text = initialName;
         NameTextBox.SelectAll();
     }
