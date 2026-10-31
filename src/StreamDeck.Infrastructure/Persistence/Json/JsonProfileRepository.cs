@@ -6,7 +6,8 @@ namespace StreamDeck.Infrastructure.Persistence.Json;
 
 public sealed class JsonProfileRepository : IProfileRepository
 {
-    private const int CurrentSchemaVersion = 1;
+    private const int SchemaVersionWithoutSlots = 1;
+    private const int SchemaVersionWithSlots = 2;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -77,9 +78,6 @@ public sealed class JsonProfileRepository : IProfileRepository
                     .ConfigureAwait(false);
             }
 
-            // File.Move con overwrite se apoya en un rename a nivel de SO: o reemplaza
-            // completo, o falla sin tocar el archivo definitivo. No hay ventana intermedia
-            // donde el archivo final quede a medio escribir.
             File.Move(tempPath, finalPath, overwrite: true);
         }
         catch
@@ -142,11 +140,11 @@ public sealed class JsonProfileRepository : IProfileRepository
             throw new InvalidDataException($"El archivo de perfil '{filePath}' está vacío o es inválido.");
         }
 
-        if (dto.SchemaVersion != CurrentSchemaVersion)
+        if (dto.SchemaVersion != SchemaVersionWithoutSlots && dto.SchemaVersion != SchemaVersionWithSlots)
         {
             throw new InvalidDataException(
                 $"El archivo de perfil '{filePath}' usa la versión de esquema {dto.SchemaVersion}, " +
-                $"que no es compatible con la versión soportada ({CurrentSchemaVersion}).");
+                $"que no es compatible con las versiones soportadas ({SchemaVersionWithoutSlots} o {SchemaVersionWithSlots}).");
         }
 
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
@@ -176,11 +174,27 @@ public sealed class JsonProfileRepository : IProfileRepository
                 $"El archivo de perfil '{filePath}' contiene una página nula dentro de 'pages'.");
         }
 
-        var pages = dto.Pages.Select(p => (p!.Id, p.Name));
-
         try
         {
-            return Profile.Reconstitute(dto.Id, dto.Name, pages);
+            if (dto.SchemaVersion == SchemaVersionWithoutSlots)
+            {
+                var pages = dto.Pages.Select(p => (p!.Id, p.Name));
+                return Profile.Reconstitute(dto.Id, dto.Name, pages);
+            }
+
+            // SchemaVersionWithSlots (2)
+            foreach (var page in dto.Pages)
+            {
+                if (page!.SlotPositions is null)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una página ('{page.Id}') sin 'slotPositions', " +
+                        $"requerido en la versión de esquema {SchemaVersionWithSlots}.");
+                }
+            }
+
+            var pagesWithSlots = dto.Pages.Select(p => (p!.Id, p.Name, (IEnumerable<int>)p.SlotPositions!));
+            return Profile.Reconstitute(dto.Id, dto.Name, pagesWithSlots);
         }
         catch (ArgumentException ex)
         {

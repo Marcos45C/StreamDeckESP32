@@ -84,26 +84,54 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         var page = profile.Pages[0];
 
         await _repository.SaveAsync(profile);
-
-        var json = await File.ReadAllTextAsync(
-            Path.Combine(_tempDirectory, $"{profile.Id}.json"));
+        var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{profile.Id}.json"));
 
         using var document = JsonDocument.Parse(json);
-
         var root = document.RootElement;
 
-        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(2, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(profile.Id, root.GetProperty("id").GetGuid());
         Assert.Equal("Mi perfil", root.GetProperty("name").GetString());
 
-        var pages = root.GetProperty("pages");
+        var pagesArray = root.GetProperty("pages");
+        Assert.Equal(1, pagesArray.GetArrayLength());
 
-        Assert.Equal(1, pages.GetArrayLength());
+        var pageElement = pagesArray[0];
+        Assert.Equal(page.Id, pageElement.GetProperty("id").GetGuid());
+        Assert.Equal("Página 1", pageElement.GetProperty("name").GetString());
 
-        var savedPage = pages[0];
+        var slotPositions = pageElement.GetProperty("slotPositions")
+            .EnumerateArray()
+            .Select(e => e.GetInt32())
+            .ToList();
 
-        Assert.Equal(page.Id, savedPage.GetProperty("id").GetGuid());
-        Assert.Equal("Página 1", savedPage.GetProperty("name").GetString());
+        Assert.Equal(Enumerable.Range(1, 9), slotPositions);
+    }
+
+    [Fact]
+    public async Task SaveAsync_ThenGetByIdAsync_EachPageHasExactlyPositionsOneToNine()
+    {
+        var profile = Profile.Create("Mi perfil");
+
+        await _repository.SaveAsync(profile);
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        var positions = loaded!.Pages[0].Slots.Select(s => s.Position).ToList();
+        Assert.Equal(Enumerable.Range(1, 9), positions);
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithMultiplePages_EachPageSavesNineSlots()
+    {
+        var profile = Profile.Create("Mi perfil");
+        profile.AddPage("Página 2");
+        profile.AddPage("Página 3");
+
+        await _repository.SaveAsync(profile);
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        Assert.Equal(3, loaded!.Pages.Count);
+        Assert.All(loaded.Pages, p => Assert.Equal(9, p.Slots.Count));
     }
 
     [Fact]
@@ -175,56 +203,168 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         Assert.Null(exception);
     }
 
-    // ---------- Archivos estructuralmente inválidos ----------
+    // ---------- Compatibilidad con esquema versión 1 ----------
+
     [Fact]
-    public async Task GetByIdAsync_WithEmptyPageIdInContent_ThrowsInvalidDataException()
+    public async Task GetByIdAsync_WithSchemaVersion1File_ReadsSuccessfully()
     {
         var id = Guid.NewGuid();
+        var pageId = Guid.NewGuid();
         await WriteRawJsonAsync(id, $$"""
         {
-        "schemaVersion": 1,
-        "id": "{{id}}",
-        "name": "Perfil",
-        "pages": [ { "id": "00000000-0000-0000-0000-000000000000", "name": "Página 1" } ]
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil antiguo",
+          "pages": [ { "id": "{{pageId}}", "name": "Página 1" } ]
         }
         """);
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+        var loaded = await _repository.GetByIdAsync(id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("Perfil antiguo", loaded!.Name);
     }
 
     [Fact]
-    public async Task GetByIdAsync_WithInvalidPageNameInContent_ThrowsInvalidDataException()
+    public async Task GetByIdAsync_WithSchemaVersion1File_PagesGetNineDefaultSlots()
     {
         var id = Guid.NewGuid();
+        var pageId = Guid.NewGuid();
         await WriteRawJsonAsync(id, $$"""
         {
-        "schemaVersion": 1,
-        "id": "{{id}}",
-        "name": "Perfil",
-        "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "   " } ]
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil antiguo",
+          "pages": [ { "id": "{{pageId}}", "name": "Página 1" } ]
         }
         """);
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+        var loaded = await _repository.GetByIdAsync(id);
+
+        var positions = loaded!.Pages[0].Slots.Select(s => s.Position).ToList();
+        Assert.Equal(Enumerable.Range(1, 9), positions);
     }
 
     [Fact]
-    public async Task GetAllAsync_WithNonGuidJsonFileName_ThrowsInvalidDataException()
+    public async Task GetByIdAsync_WithSchemaVersion1File_PreservesIdsNamesAndOrder()
     {
-        Directory.CreateDirectory(_tempDirectory);
-        var validId = Guid.NewGuid();
-        var json = $$"""
+        var id = Guid.NewGuid();
+        var page1Id = Guid.NewGuid();
+        var page2Id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
         {
-        "schemaVersion": 1,
-        "id": "{{validId}}",
-        "name": "Perfil",
-        "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1" } ]
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil antiguo",
+          "pages": [
+            { "id": "{{page1Id}}", "name": "Portada" },
+            { "id": "{{page2Id}}", "name": "Macros" }
+          ]
+        }
+        """);
+
+        var loaded = await _repository.GetByIdAsync(id);
+
+        Assert.Equal(2, loaded!.Pages.Count);
+        Assert.Equal(page1Id, loaded.Pages[0].Id);
+        Assert.Equal("Portada", loaded.Pages[0].Name);
+        Assert.Equal(page2Id, loaded.Pages[1].Id);
+        Assert.Equal("Macros", loaded.Pages[1].Name);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion1File_DoesNotModifyOriginalFile()
+    {
+        var id = Guid.NewGuid();
+        var pageId = Guid.NewGuid();
+        var originalJson = $$"""
+        {
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil antiguo",
+          "pages": [ { "id": "{{pageId}}", "name": "Página 1" } ]
         }
         """;
-        await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "perfil-invalido.json"), json);
+        await WriteRawJsonAsync(id, originalJson);
+        var filePath = Path.Combine(_tempDirectory, $"{id}.json");
+        var contentBefore = await File.ReadAllTextAsync(filePath);
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetAllAsync());
+        await _repository.GetByIdAsync(id);
+
+        var contentAfter = await File.ReadAllTextAsync(filePath);
+        Assert.Equal(contentBefore, contentAfter);
+        Assert.DoesNotContain("slotPositions", contentAfter);
     }
+
+    [Fact]
+    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion2()
+    {
+        var id = Guid.NewGuid();
+        var pageId = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil antiguo",
+          "pages": [ { "id": "{{pageId}}", "name": "Página 1" } ]
+        }
+        """);
+
+        var loaded = await _repository.GetByIdAsync(id);
+        await _repository.SaveAsync(loaded!);
+
+        var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{id}.json"));
+
+        Assert.Contains("\"schemaVersion\": 2", json);
+        Assert.Contains("\"slotPositions\"", json);
+    }
+
+    // ---------- Lectura y reconstrucción de esquema versión 2 ----------
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2_PreservesProfileIdAndName()
+    {
+        var profile = Profile.Create("Mi perfil");
+        await _repository.SaveAsync(profile);
+
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(profile.Id, loaded!.Id);
+        Assert.Equal("Mi perfil", loaded.Name);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2_PreservesPageIdNameAndOrder()
+    {
+        var profile = Profile.Create("Mi perfil");
+        var page2 = profile.AddPage("Página 2");
+        await _repository.SaveAsync(profile);
+
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        Assert.Equal(2, loaded!.Pages.Count);
+        Assert.Equal(profile.Pages[0].Id, loaded.Pages[0].Id);
+        Assert.Equal("Página 1", loaded.Pages[0].Name);
+        Assert.Equal(page2.Id, loaded.Pages[1].Id);
+        Assert.Equal("Página 2", loaded.Pages[1].Name);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2_MultiPageProfileReconstructsCorrectly()
+    {
+        var profile = Profile.Create("Mi perfil");
+        profile.AddPage("Página 2");
+        profile.AddPage("Página 3");
+        await _repository.SaveAsync(profile);
+
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        Assert.Equal(3, loaded!.Pages.Count);
+        Assert.All(loaded.Pages, p => Assert.Equal(9, p.Slots.Count));
+    }
+
+    // ---------- Archivos estructuralmente inválidos ----------
 
     [Fact]
     public async Task GetByIdAsync_WithCorruptJsonFile_ThrowsInvalidDataException()
@@ -353,12 +493,143 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
     }
 
+    [Fact]
+    public async Task GetByIdAsync_WithEmptyPageIdInContent_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "00000000-0000-0000-0000-000000000000", "name": "Página 1" } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithInvalidPageNameInContent_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 1,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "   " } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithNonGuidJsonFileName_ThrowsInvalidDataException()
+    {
+        Directory.CreateDirectory(_tempDirectory);
+        var validId = Guid.NewGuid();
+        var json = $$"""
+        {
+          "schemaVersion": 1,
+          "id": "{{validId}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1" } ]
+        }
+        """;
+        await File.WriteAllTextAsync(Path.Combine(_tempDirectory, "perfil-invalido.json"), json);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetAllAsync());
+    }
+
+    // ---------- Validaciones específicas de esquema versión 2 (slots) ----------
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2AndMissingSlotPositions_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 2,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1" } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2AndFewerThanNineSlotPositions_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 2,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1", "slotPositions": [1,2,3,4,5,6,7,8] } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2AndMoreThanNineSlotPositions_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 2,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1", "slotPositions": [1,2,3,4,5,6,7,8,9,10] } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2AndDuplicateSlotPositions_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 2,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1", "slotPositions": [1,2,3,4,5,6,7,8,8] } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion2AndOutOfRangeSlotPosition_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 2,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [ { "id": "{{Guid.NewGuid()}}", "name": "Página 1", "slotPositions": [1,2,3,4,5,6,7,8,10] } ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
     private async Task WriteRawJsonAsync(Guid id, string json)
     {
         Directory.CreateDirectory(_tempDirectory);
         await File.WriteAllTextAsync(Path.Combine(_tempDirectory, $"{id}.json"), json);
     }
-    
 
     // ---------- Escritura temporal ----------
 

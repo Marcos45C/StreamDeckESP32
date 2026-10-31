@@ -17,10 +17,15 @@ internal sealed class ProfileFileDto
     {
         return new ProfileFileDto
         {
-            SchemaVersion = 1,
+            SchemaVersion = 2,
             Id = profile.Id,
             Name = profile.Name,
-            Pages = profile.Pages.Select(p => new PageDto { Id = p.Id, Name = p.Name }).ToList(),
+            Pages = profile.Pages.Select(p => new PageDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                SlotPositions = p.Slots.Select(s => s.Position).ToList(),
+            }).ToList(),
         };
     }
 }
@@ -33,4 +38,10 @@ internal sealed class PageDto
 
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Null en archivos de esquema versión 1 (donde no existía este campo).
+    /// Obligatorio y validado al leer esquema versión 2.
+    /// </summary>
+    public List<int>? SlotPositions { get; set; }
 }
