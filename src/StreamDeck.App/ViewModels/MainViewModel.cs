@@ -46,6 +46,8 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(RemovePageCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -55,6 +57,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(RenameProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreatePageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     public partial Profile? SelectedProfile { get; set; }
 
     [ObservableProperty]
@@ -62,7 +65,13 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(RemovePageCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     public partial Page? SelectedPage { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
+    public partial ButtonSlot? SelectedButtonSlot { get; set; }
 
     [ObservableProperty]
     public partial string? ErrorMessage { get; set; }
@@ -76,6 +85,8 @@ public partial class MainViewModel : ViewModelBase
     public Func<string?, Task<string?>>? RequestPageNameAsync { get; set; }
 
     public Func<string, Task<bool>>? RequestConfirmationAsync { get; set; }
+
+    public Func<string?, Task<string?>>? RequestApplicationPathAsync { get; set; }
 
     public bool HasSelectedProfile => SelectedProfile is not null;
 
@@ -91,9 +102,39 @@ public partial class MainViewModel : ViewModelBase
             ? "Elegí un perfil de la lista en la barra lateral."
             : "Creá tu primer perfil con el botón + de la barra lateral para empezar.";
 
+    public IReadOnlyList<ButtonSlot> ButtonSlots => SelectedPage?.Slots ?? Array.Empty<ButtonSlot>();
 
+    public bool HasSelectedButtonSlot => SelectedButtonSlot is not null;
 
-    // ---------- Perfiles (sin cambios respecto a la Etapa 6.1 corregida) ----------
+    public string SelectedButtonSlotTitle => SelectedButtonSlot is not null
+        ? $"Botón {SelectedButtonSlot.Position}"
+        : string.Empty;
+
+    public string SelectedButtonSlotPositionText => SelectedButtonSlot is not null
+        ? $"Posición: {SelectedButtonSlot.Position}"
+        : string.Empty;
+
+    public string SelectedButtonSlotRowText => SelectedButtonSlot is not null
+        ? $"Fila: {SelectedButtonSlot.Row}"
+        : string.Empty;
+
+    public string SelectedButtonSlotColumnText => SelectedButtonSlot is not null
+        ? $"Columna: {SelectedButtonSlot.Column}"
+        : string.Empty;
+
+    public string SelectedButtonSlotStatusText => HasButtonAction
+        ? "Nombre: Aplicación configurada"
+        : "Estado: Sin acción asignada";
+
+    public bool HasButtonAction => SelectedButtonSlot?.Action is not null;
+
+    public bool SelectedActionIsLaunchApplication => SelectedButtonSlot?.Action is LaunchApplicationAction;
+
+    public string ConfiguredApplicationPathText => SelectedButtonSlot?.Action is LaunchApplicationAction launch
+        ? $"Ruta: {launch.ApplicationPath}"
+        : string.Empty;
+
+    // ---------- Perfiles ----------
 
     [RelayCommand]
     private async Task LoadProfilesAsync(CancellationToken cancellationToken)
@@ -221,7 +262,7 @@ public partial class MainViewModel : ViewModelBase
 
     private bool CanOperateOnSelectedProfile() => !IsBusy && SelectedProfile is not null;
 
-    // ---------- Páginas (nuevo en esta etapa) ----------
+    // ---------- Páginas ----------
 
     [RelayCommand(CanExecute = nameof(CanCreatePage))]
     private async Task CreatePageAsync()
@@ -386,6 +427,60 @@ public partial class MainViewModel : ViewModelBase
     private bool CanMoveSelectedPageRight() =>
         !IsBusy && SelectedPage is not null && Pages.IndexOf(SelectedPage) < Pages.Count - 1;
 
+    // ---------- Acciones de botones ----------
+
+    [RelayCommand(CanExecute = nameof(CanAssignOrChangeApplication))]
+    private async Task AssignApplicationAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null || RequestApplicationPathAsync is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+        var currentPath = (SelectedButtonSlot.Action as LaunchApplicationAction)?.ApplicationPath;
+
+        var newPath = await RequestApplicationPathAsync(currentPath);
+
+        if (newPath is null)
+        {
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.AssignApplicationActionAsync(profileId, pageId, position, newPath, CancellationToken.None);
+            await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
+        }, "No se pudo asignar la aplicación");
+    }
+
+    private bool CanAssignOrChangeApplication() =>
+        !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null;
+
+    [RelayCommand(CanExecute = nameof(CanClearButtonAction))]
+    private async Task ClearButtonActionAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.ClearButtonActionAsync(profileId, pageId, position, CancellationToken.None);
+            await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
+        }, "No se pudo quitar la acción");
+    }
+
+    private bool CanClearButtonAction() =>
+        !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null && HasButtonAction;
+
     // ---------- Helpers compartidos ----------
 
     private async Task RunExclusiveAsync(Func<Task> operation, string errorPrefix)
@@ -428,17 +523,20 @@ public partial class MainViewModel : ViewModelBase
         HasProfiles = Profiles.Count > 0;
     }
 
-    /// <summary>
-    /// Recarga todos los perfiles y vuelve a seleccionar el indicado por id, garantizando
-    /// que SelectedProfile sea la misma instancia que la lista Profiles (necesario para que
-    /// la selección visual del ListBox de perfiles se mantenga correcta). Usado exclusivamente
-    /// por las operaciones de páginas.
-    /// </summary>
     private async Task RefreshProfilesAsync(Guid profileIdToReselect)
     {
         var all = await _profileService.GetAllProfilesAsync(CancellationToken.None);
         ReplaceProfiles(all);
         SelectedProfile = Profiles.FirstOrDefault(p => p.Id == profileIdToReselect);
+    }
+
+    private async Task RefreshAfterButtonActionChangeAsync(Guid profileId, Guid pageId, int position)
+    {
+        var all = await _profileService.GetAllProfilesAsync(CancellationToken.None);
+        ReplaceProfiles(all);
+        SelectedProfile = Profiles.FirstOrDefault(p => p.Id == profileId);
+        SelectedPage = Pages.FirstOrDefault(p => p.Id == pageId);
+        SelectedButtonSlot = SelectedPage?.Slots.FirstOrDefault(s => s.Position == position);
     }
 
     private void SyncPagesFromSelectedProfile()
@@ -455,8 +553,6 @@ public partial class MainViewModel : ViewModelBase
 
         SelectedPage = Pages.FirstOrDefault();
     }
-    [ObservableProperty]
-    public partial ButtonSlot? SelectedButtonSlot { get; set; }
 
     partial void OnSelectedProfileChanged(Profile? value)
     {
@@ -471,34 +567,13 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CenterEmptyStateTitle));
         OnPropertyChanged(nameof(CenterEmptyStateMessage));
     }
-    public IReadOnlyList<ButtonSlot> ButtonSlots => SelectedPage?.Slots ?? Array.Empty<ButtonSlot>();
 
-    public bool HasSelectedButtonSlot => SelectedButtonSlot is not null;
-
-    public string SelectedButtonSlotTitle => SelectedButtonSlot is not null
-        ? $"Botón {SelectedButtonSlot.Position}"
-        : string.Empty;
-
-    public string SelectedButtonSlotPositionText => SelectedButtonSlot is not null
-        ? $"Posición: {SelectedButtonSlot.Position}"
-        : string.Empty;
-
-    public string SelectedButtonSlotRowText => SelectedButtonSlot is not null
-        ? $"Fila: {SelectedButtonSlot.Row}"
-        : string.Empty;
-
-    public string SelectedButtonSlotColumnText => SelectedButtonSlot is not null
-        ? $"Columna: {SelectedButtonSlot.Column}"
-        : string.Empty;
-
-    public string SelectedButtonSlotStatusText => "Estado: Sin acción asignada";
-
-    // Ahora:
     partial void OnSelectedPageChanged(Page? value)
     {
         OnPropertyChanged(nameof(ButtonSlots));
         SelectedButtonSlot = value?.Slots.FirstOrDefault();
     }
+
     partial void OnSelectedButtonSlotChanged(ButtonSlot? value)
     {
         OnPropertyChanged(nameof(HasSelectedButtonSlot));
@@ -506,5 +581,9 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedButtonSlotPositionText));
         OnPropertyChanged(nameof(SelectedButtonSlotRowText));
         OnPropertyChanged(nameof(SelectedButtonSlotColumnText));
+        OnPropertyChanged(nameof(SelectedButtonSlotStatusText));
+        OnPropertyChanged(nameof(HasButtonAction));
+        OnPropertyChanged(nameof(SelectedActionIsLaunchApplication));
+        OnPropertyChanged(nameof(ConfiguredApplicationPathText));
     }
 }

@@ -412,4 +412,64 @@ public class ProfileServiceTests
     {
         Assert.Throws<ArgumentNullException>(() => new ProfileService(null!));
     }
+    [Fact]
+    public async Task AssignApplicationActionAsync_AssignsActionAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.AssignApplicationActionAsync(profile.Id, profile.Pages[0].Id, 1, "/usr/bin/firefox");
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        var action = Assert.IsType<LaunchApplicationAction>(
+            persisted!.Pages[0].Slots.First(s => s.Position == 1).Action);
+        Assert.Equal("/usr/bin/firefox", action.ApplicationPath);
+    }
+
+    [Fact]
+    public async Task AssignApplicationActionAsync_WithUnknownProfileId_ThrowsKeyNotFoundException()
+    {
+        var service = new ProfileService(new InMemoryProfileRepository());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => service.AssignApplicationActionAsync(Guid.NewGuid(), Guid.NewGuid(), 1, "/usr/bin/firefox"));
+    }
+
+    [Fact]
+    public async Task AssignApplicationActionAsync_WithInvalidPath_PropagatesArgumentExceptionAndDoesNotCallSave()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.AssignApplicationActionAsync(profile.Id, profile.Pages[0].Id, 1, "   "));
+
+        Assert.Equal(saveCountBefore, repository.SaveCallCount);
+    }
+
+    [Fact]
+    public async Task ClearButtonActionAsync_RemovesActionAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].AssignAction(new LaunchApplicationAction("/usr/bin/firefox"));
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.ClearButtonActionAsync(profile.Id, profile.Pages[0].Id, 1);
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        Assert.Null(persisted!.Pages[0].Slots.First(s => s.Position == 1).Action);
+    }
 }

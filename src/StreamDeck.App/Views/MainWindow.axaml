@@ -5,6 +5,7 @@
         xmlns:conv="using:Avalonia.Data.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="using:StreamDeck.App.Converters"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="650"
         x:Class="StreamDeck.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -325,19 +326,18 @@
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="entities:ButtonSlot">
-                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-                                        <TextBlock Text="{Binding Position}"
-                                                FontSize="20"
-                                                FontWeight="SemiBold"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextPrimaryBrush}" />
-                                        <TextBlock Text="Sin configurar"
-                                                FontSize="10.5"
-                                                HorizontalAlignment="Center"
-                                                Foreground="{StaticResource TextSecondaryBrush}" />
-                                    </StackPanel>
-                                </DataTemplate>
+                                <!-- Ahora -->
+                                    <DataTemplate x:DataType="entities:ButtonSlot">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                                            <TextBlock Text="{Binding Position}" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Action, Converter={x:Static converters:ButtonActionStatusConverter.Instance}}"
+                                                    FontSize="10.5"
+                                                    HorizontalAlignment="Center"
+                                                    MaxWidth="110"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                    </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                     </Viewbox>
@@ -355,14 +355,36 @@
                             <TextBlock Text="{Binding PropertiesEmptyStateMessage}" Classes="EmptyStateMessage" />
                         </StackPanel>
 
+                        <!-- Ahora -->
                         <StackPanel IsVisible="{Binding HasSelectedButtonSlot}" Margin="20,24" Spacing="10">
-                            <TextBlock Text="{Binding SelectedButtonSlotTitle}"
-                                    FontSize="15" FontWeight="SemiBold"
-                                    Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="{Binding SelectedButtonSlotTitle}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotPositionText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotRowText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotColumnText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotStatusText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0" />
+                            <TextBlock Text="{Binding ConfiguredApplicationPathText}"
+                                    FontSize="11.5"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    TextWrapping="Wrap"
+                                    IsVisible="{Binding HasButtonAction}" />
+
+                            <Button Content="Asignar aplicación"
+                                    Command="{Binding AssignApplicationCommand}"
+                                    Classes="SidebarAction"
+                                    IsVisible="{Binding !HasButtonAction}"
+                                    Margin="0,8,0,0"
+                                    HorizontalAlignment="Stretch" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding HasButtonAction}">
+                                <Button Content="Cambiar aplicación"
+                                        Command="{Binding AssignApplicationCommand}"
+                                        Classes="SidebarAction" />
+                                <Button Content="Quitar acción"
+                                        Command="{Binding ClearButtonActionCommand}"
+                                        Classes="SidebarAction"
+                                        Background="#2E2125"
+                                        Foreground="{StaticResource DangerTextBrush}" />
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
                 </Border>

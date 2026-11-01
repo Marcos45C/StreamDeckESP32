@@ -52,9 +52,30 @@ internal sealed class InMemoryProfileRepository : IProfileRepository
         return Task.CompletedTask;
     }
 
+    // Ahora
     private static Profile Clone(Profile profile)
     {
-        var pages = profile.Pages.Select(p => (p.Id, p.Name));
-        return Profile.Reconstitute(profile.Id, profile.Name, pages);
+        var pages = profile.Pages.Select(p => (
+            p.Id,
+            p.Name,
+            (IEnumerable<int>)p.Slots.Select(s => s.Position).ToList()));
+
+        var cloned = Profile.Reconstitute(profile.Id, profile.Name, pages);
+
+        foreach (var originalPage in profile.Pages)
+        {
+            var clonedPage = cloned.Pages.First(p => p.Id == originalPage.Id);
+
+            foreach (var originalSlot in originalPage.Slots)
+            {
+                if (originalSlot.Action is LaunchApplicationAction launch)
+                {
+                    var clonedSlot = clonedPage.Slots.First(s => s.Position == originalSlot.Position);
+                    clonedSlot.AssignAction(new LaunchApplicationAction(launch.ApplicationPath));
+                }
+            }
+        }
+
+        return cloned;
     }
 }

@@ -18,7 +18,14 @@ public partial class MainWindow : Window
             viewModel.RequestProfileNameAsync = ShowProfileNameDialogAsync;
             viewModel.RequestPageNameAsync = ShowPageNameDialogAsync;
             viewModel.RequestConfirmationAsync = ShowConfirmationDialogAsync;
+            viewModel.RequestApplicationPathAsync = ShowApplicationPathDialogAsync;   // nuevo
         }
+    }
+
+    private async Task<string?> ShowApplicationPathDialogAsync(string? currentPath)   // nuevo
+    {
+        var dialog = new ApplicationPathDialog(currentPath);
+        return await dialog.ShowDialog<string?>(this);
     }
 
     private async Task<string?> ShowProfileNameDialogAsync(string? currentName)

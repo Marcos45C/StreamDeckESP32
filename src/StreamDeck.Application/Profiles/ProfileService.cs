@@ -76,4 +76,39 @@ public sealed class ProfileService
 
         return profile;
     }
+    // Se agregan, junto a GetProfileOrThrowAsync:
+
+    private static Page FindPageOrThrow(Profile profile, Guid pageId)
+    {
+        return profile.Pages.FirstOrDefault(p => p.Id == pageId)
+            ?? throw new KeyNotFoundException($"No existe ninguna página con el id '{pageId}' en el perfil '{profile.Id}'.");
+    }
+
+    private static ButtonSlot FindSlotOrThrow(Page page, int position)
+    {
+        return page.Slots.FirstOrDefault(s => s.Position == position)
+            ?? throw new KeyNotFoundException($"No existe ningún botón en la posición {position} de la página '{page.Id}'.");
+    }
+
+    public async Task AssignApplicationActionAsync(
+        Guid profileId, Guid pageId, int position, string applicationPath, CancellationToken cancellationToken = default)
+    {
+        var profile = await GetProfileOrThrowAsync(profileId, cancellationToken).ConfigureAwait(false);
+        var page = FindPageOrThrow(profile, pageId);
+        var slot = FindSlotOrThrow(page, position);
+
+        slot.AssignAction(new LaunchApplicationAction(applicationPath));
+        await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task ClearButtonActionAsync(
+        Guid profileId, Guid pageId, int position, CancellationToken cancellationToken = default)
+    {
+        var profile = await GetProfileOrThrowAsync(profileId, cancellationToken).ConfigureAwait(false);
+        var page = FindPageOrThrow(profile, pageId);
+        var slot = FindSlotOrThrow(page, position);
+
+        slot.ClearAction();
+        await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+    }
 }

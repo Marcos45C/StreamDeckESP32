@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="StreamDeck.App.Views.ApplicationPathDialog"
+        Title="Aplicación"
+        Width="460" Height="200"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E22">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="20">
+        <TextBlock Grid.Row="0"
+                   Text="Ruta del ejecutable"
+                   Foreground="#E4E4E7"
+                   FontSize="13"
+                   Margin="0,0,0,8" />
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0"
+                     Name="PathTextBox"
+                     Foreground="#E4E4E7"
+                     Background="#18181B"
+                     BorderBrush="#2B2B30"
+                     KeyDown="OnTextBoxKeyDown" />
+            <Button Grid.Column="1"
+                    Content="Examinar…"
+                    Click="OnBrowseClick"
+                    Margin="8,0,0,0" />
+        </Grid>
+        <TextBlock Grid.Row="2"
+                   Name="ErrorTextBlock"
+                   Foreground="#E88A8A"
+                   FontSize="11.5"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   IsVisible="False" />
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Spacing="8">
+            <Button Content="Cancelar" Click="OnCancelClick" />
+            <Button Content="Aceptar" Click="OnAcceptClick" />
+        </StackPanel>
+    </Grid>
+</Window>
