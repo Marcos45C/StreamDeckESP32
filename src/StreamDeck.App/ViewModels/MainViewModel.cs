@@ -91,12 +91,7 @@ public partial class MainViewModel : ViewModelBase
             ? "Elegí un perfil de la lista en la barra lateral."
             : "Creá tu primer perfil con el botón + de la barra lateral para empezar.";
 
-    public string PageEmptyStateTitle => SelectedPage is not null
-        ? $"Página: {SelectedPage.Name}"
-        : "Seleccioná una página";
 
-    public string PageEmptyStateMessage =>
-        "La distribución de botones se incorporará en una próxima etapa.";
 
     // ---------- Perfiles (sin cambios respecto a la Etapa 6.1 corregida) ----------
 
@@ -460,6 +455,8 @@ public partial class MainViewModel : ViewModelBase
 
         SelectedPage = Pages.FirstOrDefault();
     }
+    [ObservableProperty]
+    public partial ButtonSlot? SelectedButtonSlot { get; set; }
 
     partial void OnSelectedProfileChanged(Profile? value)
     {
@@ -474,9 +471,40 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CenterEmptyStateTitle));
         OnPropertyChanged(nameof(CenterEmptyStateMessage));
     }
+    public IReadOnlyList<ButtonSlot> ButtonSlots => SelectedPage?.Slots ?? Array.Empty<ButtonSlot>();
 
+    public bool HasSelectedButtonSlot => SelectedButtonSlot is not null;
+
+    public string SelectedButtonSlotTitle => SelectedButtonSlot is not null
+        ? $"Botón {SelectedButtonSlot.Position}"
+        : string.Empty;
+
+    public string SelectedButtonSlotPositionText => SelectedButtonSlot is not null
+        ? $"Posición: {SelectedButtonSlot.Position}"
+        : string.Empty;
+
+    public string SelectedButtonSlotRowText => SelectedButtonSlot is not null
+        ? $"Fila: {SelectedButtonSlot.Row}"
+        : string.Empty;
+
+    public string SelectedButtonSlotColumnText => SelectedButtonSlot is not null
+        ? $"Columna: {SelectedButtonSlot.Column}"
+        : string.Empty;
+
+    public string SelectedButtonSlotStatusText => "Estado: Sin acción asignada";
+
+    // Ahora:
     partial void OnSelectedPageChanged(Page? value)
     {
-        OnPropertyChanged(nameof(PageEmptyStateTitle));
+        OnPropertyChanged(nameof(ButtonSlots));
+        SelectedButtonSlot = value?.Slots.FirstOrDefault();
+    }
+    partial void OnSelectedButtonSlotChanged(ButtonSlot? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedButtonSlot));
+        OnPropertyChanged(nameof(SelectedButtonSlotTitle));
+        OnPropertyChanged(nameof(SelectedButtonSlotPositionText));
+        OnPropertyChanged(nameof(SelectedButtonSlotRowText));
+        OnPropertyChanged(nameof(SelectedButtonSlotColumnText));
     }
 }
