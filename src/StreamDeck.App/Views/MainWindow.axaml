@@ -375,7 +375,12 @@
                                     Margin="0,8,0,0"
                                     HorizontalAlignment="Stretch" />
 
+                            <!-- Ahora -->
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding HasButtonAction}">
+                                <Button Content="Probar acción"
+                                        Command="{Binding ExecuteSelectedButtonActionCommand}"
+                                        Classes="SidebarAction"
+                                        IsVisible="{Binding SelectedActionIsLaunchApplication}" />
                                 <Button Content="Cambiar aplicación"
                                         Command="{Binding AssignApplicationCommand}"
                                         Classes="SidebarAction" />

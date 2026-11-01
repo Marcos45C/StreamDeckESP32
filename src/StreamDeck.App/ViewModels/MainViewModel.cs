@@ -3,17 +3,21 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StreamDeck.Application.Profiles;
 using StreamDeck.Domain.Entities;
-
+using StreamDeck.Application.Execution;
 namespace StreamDeck.App.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
+    // Ahora
     private readonly ProfileService _profileService;
+    private readonly ButtonActionExecutionService _buttonActionExecutionService;
 
-    public MainViewModel(ProfileService profileService)
+    public MainViewModel(ProfileService profileService, ButtonActionExecutionService buttonActionExecutionService)
     {
         ArgumentNullException.ThrowIfNull(profileService);
+        ArgumentNullException.ThrowIfNull(buttonActionExecutionService);
         _profileService = profileService;
+        _buttonActionExecutionService = buttonActionExecutionService;
 
         LoadProfilesCommand.Execute(null);
     }
@@ -48,6 +52,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -58,6 +63,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreatePageCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial Profile? SelectedProfile { get; set; }
 
     [ObservableProperty]
@@ -66,11 +72,13 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial Page? SelectedPage { get; set; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial ButtonSlot? SelectedButtonSlot { get; set; }
 
     [ObservableProperty]
@@ -477,6 +485,32 @@ public partial class MainViewModel : ViewModelBase
             await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
         }, "No se pudo quitar la acción");
     }
+    [RelayCommand(CanExecute = nameof(CanExecuteSelectedButtonAction))]
+    private async Task ExecuteSelectedButtonActionAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null)
+        {
+            return;
+        }
+
+        if (SelectedButtonSlot.Action is not LaunchApplicationAction)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _buttonActionExecutionService.ExecuteAsync(profileId, pageId, position, CancellationToken.None);
+        }, "No se pudo ejecutar la acción");
+    }
+
+    private bool CanExecuteSelectedButtonAction() =>
+        !IsBusy && SelectedProfile is not null && SelectedPage is not null
+        && SelectedButtonSlot?.Action is LaunchApplicationAction;
 
     private bool CanClearButtonAction() =>
         !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null && HasButtonAction;
