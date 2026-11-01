@@ -1,4 +1,4 @@
-using StreamDeck.Domain.Entities;
+
 using StreamDeck.Application.Profiles;
 using StreamDeck.Domain.Entities;
 namespace StreamDeck.Application.Tests;

@@ -8,6 +8,7 @@ public sealed class JsonProfileRepository : IProfileRepository
 {
     private const int SchemaVersionWithoutSlots = 1;
     private const int SchemaVersionWithSlots = 2;
+    private const int SchemaVersionWithActions = 3;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -140,11 +141,15 @@ public sealed class JsonProfileRepository : IProfileRepository
             throw new InvalidDataException($"El archivo de perfil '{filePath}' está vacío o es inválido.");
         }
 
-        if (dto.SchemaVersion != SchemaVersionWithoutSlots && dto.SchemaVersion != SchemaVersionWithSlots)
+        // Ahora
+        if (dto.SchemaVersion != SchemaVersionWithoutSlots
+            && dto.SchemaVersion != SchemaVersionWithSlots
+            && dto.SchemaVersion != SchemaVersionWithActions)
         {
             throw new InvalidDataException(
                 $"El archivo de perfil '{filePath}' usa la versión de esquema {dto.SchemaVersion}, " +
-                $"que no es compatible con las versiones soportadas ({SchemaVersionWithoutSlots} o {SchemaVersionWithSlots}).");
+                "que no es compatible con las versiones soportadas " +
+                $"({SchemaVersionWithoutSlots}, {SchemaVersionWithSlots} o {SchemaVersionWithActions}).");
         }
 
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
@@ -176,25 +181,36 @@ public sealed class JsonProfileRepository : IProfileRepository
 
         try
         {
+            Profile profile;
+
             if (dto.SchemaVersion == SchemaVersionWithoutSlots)
             {
                 var pages = dto.Pages.Select(p => (p!.Id, p.Name));
-                return Profile.Reconstitute(dto.Id, dto.Name, pages);
+                profile = Profile.Reconstitute(dto.Id, dto.Name, pages);
             }
-
-            // SchemaVersionWithSlots (2)
-            foreach (var page in dto.Pages)
+            else
             {
-                if (page!.SlotPositions is null)
+                // SchemaVersionWithSlots (2) o SchemaVersionWithActions (3): ambas requieren slotPositions
+                foreach (var page in dto.Pages)
                 {
-                    throw new InvalidDataException(
-                        $"El archivo de perfil '{filePath}' contiene una página ('{page.Id}') sin 'slotPositions', " +
-                        $"requerido en la versión de esquema {SchemaVersionWithSlots}.");
+                    if (page!.SlotPositions is null)
+                    {
+                        throw new InvalidDataException(
+                            $"El archivo de perfil '{filePath}' contiene una página ('{page.Id}') sin 'slotPositions', " +
+                            $"requerido en la versión de esquema {dto.SchemaVersion}.");
+                    }
                 }
+
+                var pagesWithSlots = dto.Pages.Select(p => (p!.Id, p.Name, (IEnumerable<int>)p.SlotPositions!));
+                profile = Profile.Reconstitute(dto.Id, dto.Name, pagesWithSlots);
             }
 
-            var pagesWithSlots = dto.Pages.Select(p => (p!.Id, p.Name, (IEnumerable<int>)p.SlotPositions!));
-            return Profile.Reconstitute(dto.Id, dto.Name, pagesWithSlots);
+            if (dto.SchemaVersion == SchemaVersionWithActions)
+            {
+                ApplyActions(profile, dto.Pages, filePath);
+            }
+
+            return profile;
         }
         catch (ArgumentException ex)
         {
@@ -202,4 +218,63 @@ public sealed class JsonProfileRepository : IProfileRepository
                 $"El archivo de perfil '{filePath}' contiene datos de dominio inválidos: {ex.Message}", ex);
         }
     }
+    // Método nuevo, agregado a la clase
+    private static void ApplyActions(Profile profile, List<PageDto> pageDtos, string filePath)
+    {
+        foreach (var pageDto in pageDtos)
+        {
+            if (pageDto!.Actions is null)
+            {
+                throw new InvalidDataException(
+                    $"El archivo de perfil '{filePath}' contiene una página ('{pageDto.Id}') sin 'actions', " +
+                    $"requerido en la versión de esquema {SchemaVersionWithActions}.");
+            }
+
+            if (pageDto.Actions.Any(a => a is null))
+            {
+                throw new InvalidDataException(
+                    $"El archivo de perfil '{filePath}' contiene una acción nula en la página '{pageDto.Id}'.");
+            }
+
+            var page = profile.Pages.First(p => p.Id == pageDto.Id);
+            var seenPositions = new HashSet<int>();
+
+            foreach (var actionDto in pageDto.Actions)
+            {
+                if (actionDto!.Position < 1 || actionDto.Position > Page.SlotCount)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una acción con posición inválida " +
+                        $"({actionDto.Position}) en la página '{pageDto.Id}'.");
+                }
+
+                if (!seenPositions.Add(actionDto.Position))
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene más de una acción para la posición " +
+                        $"{actionDto.Position} en la página '{pageDto.Id}'.");
+                }
+
+                if (actionDto.Type != "launchApplication")
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene un tipo de acción desconocido " +
+                        $"('{actionDto.Type}') en la posición {actionDto.Position} de la página '{pageDto.Id}'.");
+                }
+
+                var slot = page.Slots.First(s => s.Position == actionDto.Position);
+
+                try
+                {
+                    slot.AssignAction(new LaunchApplicationAction(actionDto.ApplicationPath ?? string.Empty));
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una acción inválida en la posición " +
+                        $"{actionDto.Position} de la página '{pageDto.Id}': {ex.Message}", ex);
+                }
+            }
+        }
+}
 }
