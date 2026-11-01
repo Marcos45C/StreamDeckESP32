@@ -92,13 +92,13 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         Assert.Equal(3, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(profile.Id, root.GetProperty("id").GetGuid());
         Assert.Equal("Mi perfil", root.GetProperty("name").GetString());
-        
-        Assert.Equal(0, actionsArray.GetArrayLength());
+
         var pagesArray = root.GetProperty("pages");
         Assert.Equal(1, pagesArray.GetArrayLength());
 
         var pageElement = pagesArray[0];
         var actionsArray = pageElement.GetProperty("actions");
+        Assert.Equal(0, actionsArray.GetArrayLength());
         Assert.Equal(page.Id, pageElement.GetProperty("id").GetGuid());
         Assert.Equal("Página 1", pageElement.GetProperty("name").GetString());
 
