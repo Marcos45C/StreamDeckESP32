@@ -6,8 +6,8 @@ namespace StreamDeck.App.Converters;
 
 /// <summary>
 /// Convierte el ButtonAction? de un ButtonSlot en el texto secundario que se muestra
-/// en la grilla: "Sin configurar" si está vacío, o el nombre del ejecutable si tiene
-/// una LaunchApplicationAction asignada.
+/// en la grilla: "Sin configurar" si está vacío, el nombre del ejecutable para una
+/// LaunchApplicationAction o el host para una OpenUrlAction.
 /// </summary>
 public sealed class ButtonActionStatusConverter : IValueConverter
 {
@@ -18,6 +18,7 @@ public sealed class ButtonActionStatusConverter : IValueConverter
         return value switch
         {
             LaunchApplicationAction launch => GetDisplayName(launch.ApplicationPath),
+            OpenUrlAction openUrl => GetUrlDisplayName(openUrl.Url),
             null => "Sin configurar",
             _ => "Configurado",
         };
@@ -32,5 +33,12 @@ public sealed class ButtonActionStatusConverter : IValueConverter
     {
         var fileName = Path.GetFileName(applicationPath);
         return string.IsNullOrEmpty(fileName) ? applicationPath : fileName;
+    }
+
+    private static string GetUrlDisplayName(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            ? uri.Host
+            : url;
     }
 }

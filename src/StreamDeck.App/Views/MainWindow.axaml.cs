@@ -24,6 +24,7 @@ public partial class MainWindow : Window
             viewModel.RequestPageNameAsync = ShowPageNameDialogAsync;
             viewModel.RequestConfirmationAsync = ShowConfirmationDialogAsync;
             viewModel.RequestApplicationPathAsync = ShowApplicationPathDialogAsync;
+            viewModel.RequestUrlAsync = ShowOpenUrlDialogAsync;
         }
     }
 
@@ -77,6 +78,12 @@ public partial class MainWindow : Window
     private async Task<string?> ShowApplicationPathDialogAsync(string? currentPath)
     {
         var dialog = new ApplicationPathDialog(currentPath);
+        return await dialog.ShowDialog<string?>(this);
+    }
+
+    private async Task<string?> ShowOpenUrlDialogAsync(string? currentUrl)
+    {
+        var dialog = new OpenUrlDialog(currentUrl);
         return await dialog.ShowDialog<string?>(this);
     }
 }

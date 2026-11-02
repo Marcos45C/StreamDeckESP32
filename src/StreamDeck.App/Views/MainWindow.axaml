@@ -404,32 +404,44 @@
                             <TextBlock Text="{Binding SelectedButtonSlotRowText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotColumnText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotStatusText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0" />
-                            <TextBlock Text="{Binding ConfiguredApplicationPathText}"
+                            <TextBlock Text="{Binding ConfiguredActionDetailsText}"
                                        FontSize="11.5"
                                        Foreground="{StaticResource TextSecondaryBrush}"
                                        TextWrapping="Wrap"
                                        IsVisible="{Binding HasButtonAction}" />
 
-                            <Button Content="Asignar aplicación"
-                                    Command="{Binding AssignApplicationCommand}"
-                                    Classes="SidebarAction"
-                                    IsVisible="{Binding !HasButtonAction}"
-                                    Margin="0,8,0,0"
-                                    HorizontalAlignment="Stretch" />
+                            <StackPanel Spacing="8"
+                                        Margin="0,8,0,0"
+                                        IsVisible="{Binding !HasButtonAction}">
+                                <Button Content="Asignar aplicación"
+                                        Command="{Binding AssignApplicationCommand}"
+                                        Classes="SidebarAction"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Content="Abrir URL"
+                                        Command="{Binding AssignUrlCommand}"
+                                        Classes="SidebarAction"
+                                        HorizontalAlignment="Stretch" />
+                            </StackPanel>
 
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding HasButtonAction}">
+                            <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding HasButtonAction}">
                                 <Button Content="Probar acción"
                                         Command="{Binding ExecuteSelectedButtonActionCommand}"
                                         Classes="SidebarAction"
-                                        IsVisible="{Binding SelectedActionIsLaunchApplication}" />
+                                        HorizontalAlignment="Stretch" />
                                 <Button Content="Cambiar aplicación"
                                         Command="{Binding AssignApplicationCommand}"
-                                        Classes="SidebarAction" />
+                                        Classes="SidebarAction"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Content="Cambiar URL"
+                                        Command="{Binding AssignUrlCommand}"
+                                        Classes="SidebarAction"
+                                        HorizontalAlignment="Stretch" />
                                 <Button Content="Quitar acción"
                                         Command="{Binding ClearButtonActionCommand}"
                                         Classes="SidebarAction"
                                         Background="#2E2125"
-                                        Foreground="{StaticResource DangerTextBrush}" />
+                                        Foreground="{StaticResource DangerTextBrush}"
+                                        HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </StackPanel>
                     </Grid>

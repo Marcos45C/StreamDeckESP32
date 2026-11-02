@@ -84,6 +84,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial bool IsBusy { get; set; }
@@ -96,6 +97,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreatePageCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial Profile? SelectedProfile { get; set; }
 
@@ -105,11 +107,13 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(MovePageLeftCommand))]
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial Page? SelectedPage { get; set; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     public partial ButtonSlot? SelectedButtonSlot { get; set; }
@@ -151,6 +155,8 @@ public partial class MainViewModel : ViewModelBase
 
     public Func<string?, Task<string?>>? RequestApplicationPathAsync { get; set; }
 
+    public Func<string?, Task<string?>>? RequestUrlAsync { get; set; }
+
     public bool HasSelectedProfile => SelectedProfile is not null;
 
     public string CenterEmptyStateTitle => SelectedProfile is not null
@@ -185,17 +191,21 @@ public partial class MainViewModel : ViewModelBase
         ? $"Columna: {SelectedButtonSlot.Column}"
         : string.Empty;
 
-    public string SelectedButtonSlotStatusText => HasButtonAction
-        ? "Nombre: Aplicación configurada"
-        : "Estado: Sin acción asignada";
+    public string SelectedButtonSlotStatusText => SelectedButtonSlot?.Action switch
+    {
+        LaunchApplicationAction => "Tipo: Aplicación",
+        OpenUrlAction => "Tipo: Abrir URL",
+        _ => "Estado: Sin acción asignada",
+    };
 
     public bool HasButtonAction => SelectedButtonSlot?.Action is not null;
 
-    public bool SelectedActionIsLaunchApplication => SelectedButtonSlot?.Action is LaunchApplicationAction;
-
-    public string ConfiguredApplicationPathText => SelectedButtonSlot?.Action is LaunchApplicationAction launch
-        ? $"Ruta: {launch.ApplicationPath}"
-        : string.Empty;
+    public string ConfiguredActionDetailsText => SelectedButtonSlot?.Action switch
+    {
+        LaunchApplicationAction launch => $"Ejecutable: {launch.ApplicationPath}",
+        OpenUrlAction openUrl => $"URL: {openUrl.Url}",
+        _ => string.Empty,
+    };
 
     public string DeviceStatusText => DeviceState switch
     {
@@ -537,6 +547,34 @@ public partial class MainViewModel : ViewModelBase
     private bool CanAssignOrChangeApplication() =>
         !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null;
 
+    [RelayCommand(CanExecute = nameof(CanAssignOrChangeApplication))]
+    private async Task AssignUrlAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null || RequestUrlAsync is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+        var currentUrl = (SelectedButtonSlot.Action as OpenUrlAction)?.Url;
+
+        var newUrl = await RequestUrlAsync(currentUrl);
+
+        if (newUrl is null)
+        {
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.AssignOpenUrlActionAsync(
+                profileId, pageId, position, newUrl, CancellationToken.None);
+            await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
+        }, "No se pudo asignar la URL");
+    }
+
     [RelayCommand(CanExecute = nameof(CanClearButtonAction))]
     private async Task ClearButtonActionAsync()
     {
@@ -567,7 +605,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        if (SelectedButtonSlot.Action is not LaunchApplicationAction)
+        if (SelectedButtonSlot.Action is null)
         {
             return;
         }
@@ -584,7 +622,7 @@ public partial class MainViewModel : ViewModelBase
 
     private bool CanExecuteSelectedButtonAction() =>
         !IsBusy && SelectedProfile is not null && SelectedPage is not null
-        && SelectedButtonSlot?.Action is LaunchApplicationAction;
+        && SelectedButtonSlot?.Action is not null;
 
     // ---------- Conexión con el dispositivo ----------
 
@@ -913,8 +951,7 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedButtonSlotColumnText));
         OnPropertyChanged(nameof(SelectedButtonSlotStatusText));
         OnPropertyChanged(nameof(HasButtonAction));
-        OnPropertyChanged(nameof(SelectedActionIsLaunchApplication));
-        OnPropertyChanged(nameof(ConfiguredApplicationPathText));
+        OnPropertyChanged(nameof(ConfiguredActionDetailsText));
     }
 
     partial void OnDeviceStateChanged(DeviceConnectionState value)

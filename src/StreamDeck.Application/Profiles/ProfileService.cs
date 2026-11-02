@@ -101,6 +101,17 @@ public sealed class ProfileService
         await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task AssignOpenUrlActionAsync(
+        Guid profileId, Guid pageId, int position, string url, CancellationToken cancellationToken = default)
+    {
+        var profile = await GetProfileOrThrowAsync(profileId, cancellationToken).ConfigureAwait(false);
+        var page = FindPageOrThrow(profile, pageId);
+        var slot = FindSlotOrThrow(page, position);
+
+        slot.AssignAction(new OpenUrlAction(url));
+        await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task ClearButtonActionAsync(
         Guid profileId, Guid pageId, int position, CancellationToken cancellationToken = default)
     {

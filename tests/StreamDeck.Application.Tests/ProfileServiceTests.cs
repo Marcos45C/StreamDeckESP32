@@ -456,6 +456,42 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public async Task AssignOpenUrlActionAsync_AssignsActionAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.AssignOpenUrlActionAsync(
+            profile.Id, profile.Pages[0].Id, 1, "https://example.com/ruta");
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        var action = Assert.IsType<OpenUrlAction>(
+            persisted!.Pages[0].Slots.First(s => s.Position == 1).Action);
+        Assert.Equal("https://example.com/ruta", action.Url);
+    }
+
+    [Fact]
+    public async Task AssignOpenUrlActionAsync_WithInvalidUrl_PropagatesArgumentExceptionAndDoesNotCallSave()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.AssignOpenUrlActionAsync(
+                profile.Id, profile.Pages[0].Id, 1, "ftp://example.com"));
+
+        Assert.Equal(saveCountBefore, repository.SaveCallCount);
+    }
+
+    [Fact]
     public async Task ClearButtonActionAsync_RemovesActionAndPersists()
     {
         var repository = new InMemoryProfileRepository();
