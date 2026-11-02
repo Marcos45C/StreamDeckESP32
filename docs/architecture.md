@@ -4,48 +4,62 @@
 
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
-| `StreamDeck.Domain` | Entidades, modelos de negocio, enumeraciones, objetos de valor, reglas de dominio. | (ninguno interno) |
-| `StreamDeck.Application` | Casos de uso, interfaces de servicios, coordinación de funcionalidades. | Domain |
-| `StreamDeck.Infrastructure` | Futuro almacenamiento JSON, acceso al sistema operativo, ejecución de acciones. | Application, Domain |
-| `StreamDeck.Device` | Futura administración del ESP32: estado de conexión, USB, Bluetooth. | Application, Domain |
-| `StreamDeck.App` | Interfaz Avalonia (MVVM): ventanas, vistas, ViewModels, recursos visuales. | Application, Domain, Infrastructure, Device |
+| `StreamDeck.Domain` | Perfiles, páginas, posiciones de botones, acciones y colores configurables. Contiene las reglas y validaciones del dominio. | Ninguno interno |
+| `StreamDeck.Application` | Casos de uso para perfiles y páginas, configuración de acciones y colores, ejecución de acciones e interfaces para los servicios externos. | Domain |
+| `StreamDeck.Infrastructure` | Persistencia JSON local y adaptadores del sistema operativo para ejecutar aplicaciones y abrir URLs. | Application, Domain |
+| `StreamDeck.Device` | Enumeración, conexión y comunicación serie con el firmware ESP32. | Application, Domain |
+| `StreamDeck.App` | Interfaz Avalonia, ViewModels, diálogos, composición de dependencias y presentación de estados. | Application, Domain, Infrastructure, Device |
 
-Sin dependencias circulares. `Domain` es la única capa sin dependencias internas.
+No hay dependencias circulares. `Domain` es la única capa sin dependencias internas.
 
-## Configuración compartida
+## Puntos principales
 
-`Directory.Build.props` (raíz del repo) centraliza, para todos los proyectos:
+- `Domain/Entities/Profile.cs`: perfil y administración de páginas.
+- `Domain/Entities/Page.cs`: página con nueve posiciones fijas.
+- `Domain/Entities/ButtonSlot.cs`: posición, acción opcional y color visual opcional (`#RRGGBB`).
+- `Domain/Entities/ButtonAction.cs`: tipo base de acción.
+- `Domain/Entities/LaunchApplicationAction.cs`: ruta de una aplicación.
+- `Domain/Entities/OpenUrlAction.cs`: URL absoluta HTTP/HTTPS.
+- `Application/Profiles/ProfileService.cs`: operaciones y persistencia de perfiles, acciones y colores.
+- `Application/Execution/ButtonActionExecutionService.cs`: resuelve y ejecuta la acción asignada a una posición.
+- `Infrastructure/Persistence/Json/JsonProfileRepository.cs`: lectura y escritura atómica de archivos JSON.
+- `Infrastructure/Execution/`: apertura de aplicaciones y URLs en el sistema operativo.
+- `Device/Serial/SerialDeviceConnection.cs`: conexión serie, handshake y recepción de pulsaciones.
+- `App/ViewModels/MainViewModel.cs`: coordinación de la interfaz, la selección activa y la cola de pulsaciones físicas.
 
-```xml
-<Nullable>enable</Nullable>
-<ImplicitUsings>enable</ImplicitUsings>
-```
+## Persistencia JSON
 
-Todos los proyectos apuntan a `net10.0`.
+Cada perfil se guarda en un archivo independiente. El repositorio escribe actualmente `schemaVersion: 5`.
 
-## MVVM en StreamDeck.App
+| Versión | Contenido agregado |
+|---:|---|
+| 1 | Perfil y páginas. |
+| 2 | Las nueve posiciones de botones por página. |
+| 3 | Acciones `launchApplication`. |
+| 4 | Acciones `openUrl` además de aplicaciones. |
+| 5 | Colores visuales opcionales para cada posición. |
 
-- `ViewModels/ViewModelBase.cs`: clase base abstracta sobre `ObservableObject` (CommunityToolkit.Mvvm).
-- `ViewModels/MainViewModel.cs`: ViewModel de la ventana principal. Usa propiedades parciales con `[ObservableProperty]` (C# 13, incluido por defecto al apuntar a `net10.0` — sin `LangVersion=preview`).
-- `Views/MainWindow.axaml` + `.axaml.cs`: vista de la ventana principal. El `DataContext` se asigna explícitamente en `App.axaml.cs`.
-- `ViewLocator.cs`: resuelve automáticamente una vista `XxxView` para un ViewModel `XxxViewModel`, pensado para vistas que se agreguen en etapas futuras. Registrado en `App.axaml` vía `Application.DataTemplates`.
-- Tema: `RequestedThemeVariant="Dark"` fijo en `App.axaml` (no sigue el tema del sistema).
+El repositorio mantiene lectura compatible con v1 a v4. Leer un archivo antiguo no lo modifica; al guardar ese perfil se escribe el esquema v5.
 
-## Paquetes NuGet utilizados
+## MVVM y composición
 
-Solo en `StreamDeck.App`:
+- `ViewModels/ViewModelBase.cs` es la clase base MVVM.
+- `ViewModels/MainViewModel.cs` contiene propiedades observables y comandos mediante CommunityToolkit.Mvvm.
+- `Views/MainWindow.axaml` define la interfaz principal.
+- `Views/MainWindow.axaml.cs` conecta los delegados de los diálogos y gestiona el cierre seguro cuando el dispositivo está conectado.
+- `App.axaml.cs` crea las implementaciones concretas y las inyecta en el ViewModel principal.
 
-- `Avalonia` 12.1.4
-- `Avalonia.Desktop` 12.1.4
-- `Avalonia.Themes.Fluent` 12.1.4
-- `Avalonia.Fonts.Inter` 12.1.4
-- `AvaloniaUI.DiagnosticsSupport` 2.2.3 (solo en Debug)
-- `CommunityToolkit.Mvvm` 8.4.2
+## Dependencias principales
 
-Ningún otro proyecto tiene paquetes NuGet adicionales.
+- `StreamDeck.App`: Avalonia 12.1.4, CommunityToolkit.Mvvm 8.4.2 y paquetes de interfaz asociados.
+- `StreamDeck.Device`: `System.IO.Ports` 10.0.12.
+- Persistencia JSON: `System.Text.Json` incluido en .NET.
+- Firmware: PlatformIO, plataforma `espressif32`, framework Arduino.
 
-## Convenciones
+Todos los proyectos C# apuntan a `net10.0`. `Directory.Build.props` centraliza `Nullable` e `ImplicitUsings`.
 
-- Namespace por proyecto: `StreamDeck.<Capa>` (ej. `StreamDeck.App.ViewModels`).
-- Nombre de archivo = nombre de clase.
-- Vistas en `Views/`, ViewModels en `ViewModels/`, modelos de dominio en `StreamDeck.Domain` (no dentro de `StreamDeck.App`).
+## Pruebas
+
+- `StreamDeck.Domain.Tests`: reglas de perfiles, páginas, botones, acciones y colores.
+- `StreamDeck.Application.Tests`: casos de uso con repositorio en memoria y lanzadores simulados.
+- `StreamDeck.Infrastructure.Tests`: persistencia JSON, migraciones y validaciones de esquemas.

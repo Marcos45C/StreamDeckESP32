@@ -206,8 +206,7 @@ reintentando según la secuencia de la sección 5.1 hasta agotar la ventana de 5
 
 ## 6. Mapa de GPIO (lógico/físico)
 
-Asignación inicial de pines para los nueve pulsadores. Documentado únicamente como
-referencia para el cableado futuro — **todavía no implementado ni cableado**.
+Asignación de pines implementada en el firmware y utilizada para los nueve pulsadores físicos.
 
 | Posición | GPIO |
 |---:|---:|
@@ -227,9 +226,9 @@ referencia para el cableado futuro — **todavía no implementado ni cableado**.
 > conflicto. Si una versión futura necesitara `UART2`, estas dos posiciones deberían
 > reasignarse a otros GPIO libres.
 
-## 7. Detección de pulsaciones (comportamiento previsto del firmware)
+## 7. Detección de pulsaciones (firmware actual)
 
-Documentado para una implementación futura — **no implementado todavía**:
+Comportamiento implementado en el firmware actual:
 
 - Cada pulsador conecta su GPIO a GND al presionarse.
 - Cada pin se configura como `INPUT_PULLUP`.
@@ -246,8 +245,7 @@ Documentado para una implementación futura — **no implementado todavía**:
 
 ## 8. Tratamiento de mensajes y manejo de errores
 
-Reglas que debe seguir el lado que recibe (aplicación de escritorio leyendo del ESP32, y
-ESP32 leyendo de la aplicación), documentadas para ambas implementaciones futuras:
+Reglas de framing y validación implementadas en los receptores de la aplicación y del firmware:
 
 - **No asumir alineación con los límites de una lectura USB**: una lectura física del
   puerto puede traer un mensaje incompleto, un mensaje completo, varios mensajes juntos,
@@ -262,7 +260,6 @@ ESP32 leyendo de la aplicación), documentadas para ambas implementaciones futur
 - **Comandos desconocidos** se ignoran sin bloquear ni reiniciar el dispositivo ni la
   conexión — el protocolo debe seguir funcionando con normalidad ante un mensaje que no
   reconoce.
- - **Mensajes que superan el tamaño máximo** (64 bytes) se descartan por completo: el
 - **Mensajes que superan el tamaño máximo** (64 bytes de contenido, sin contar el
   terminador) se descartan por completo: el
    receptor sigue consumiendo bytes sin procesarlos hasta encontrar el próximo `\n`, y
@@ -302,7 +299,7 @@ protocolo (ver sección 10).
   una acción asignada, ejecutarla (reutilizando el mismo servicio de ejecución ya
   implementado para "Probar acción" en la Etapa 7.7).
 
-La computadora es la única fuente de verdad para perfiles, páginas y acciones — el ESP32
+La computadora es la única fuente de verdad para perfiles, páginas, acciones y colores — el ESP32
 nunca almacena ni necesita conocer esos datos.
 
 ## 10. Consideraciones para futuras versiones del protocolo

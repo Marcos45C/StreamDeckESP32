@@ -1,5 +1,6 @@
-using StreamDeck.Domain.Entities;
 using System.Text.Json.Serialization;
+using StreamDeck.Domain.Entities;
+
 namespace StreamDeck.Infrastructure.Persistence.Json;
 
 internal sealed class ProfileFileDto
@@ -14,46 +15,54 @@ internal sealed class ProfileFileDto
     public List<PageDto> Pages { get; set; } = new();
 
     public static ProfileFileDto FromDomain(Profile profile)
-{
-    return new ProfileFileDto
     {
-        SchemaVersion = 4,
-        Id = profile.Id,
-        Name = profile.Name,
-        Pages = profile.Pages.Select(p => new PageDto
+        return new ProfileFileDto
         {
-            Id = p.Id,
-            Name = p.Name,
-            SlotPositions = p.Slots.Select(s => s.Position).ToList(),
-            Actions = p.Slots
-                .Where(s => s.Action is not null)
-                .Select(ToActionDto)
-                .ToList(),
-        }).ToList(),
-    };
-}
+            SchemaVersion = 5,
+            Id = profile.Id,
+            Name = profile.Name,
+            Pages = profile.Pages.Select(page => new PageDto
+            {
+                Id = page.Id,
+                Name = page.Name,
+                SlotPositions = page.Slots.Select(slot => slot.Position).ToList(),
+                Actions = page.Slots
+                    .Where(slot => slot.Action is not null)
+                    .Select(ToActionDto)
+                    .ToList(),
+                SlotColors = page.Slots
+                    .Where(slot => slot.ColorHex is not null)
+                    .Select(slot => new SlotColorDto
+                    {
+                        Position = slot.Position,
+                        ColorHex = slot.ColorHex,
+                    })
+                    .ToList(),
+            }).ToList(),
+        };
+    }
 
-private static ActionDto ToActionDto(ButtonSlot slot)
-{
-    return slot.Action switch
+    private static ActionDto ToActionDto(ButtonSlot slot)
     {
-        LaunchApplicationAction launch => new ActionDto
+        return slot.Action switch
         {
-            Position = slot.Position,
-            Type = "launchApplication",
-            ApplicationPath = launch.ApplicationPath,
-        },
-        OpenUrlAction openUrl => new ActionDto
-        {
-            Position = slot.Position,
-            Type = "openUrl",
-            Url = openUrl.Url,
-        },
-        _ => throw new NotSupportedException(
-            $"El tipo de acción '{slot.Action?.GetType().Name}' en la posición {slot.Position} " +
-            "no está soportado por la persistencia."),
-    };
-}
+            LaunchApplicationAction launch => new ActionDto
+            {
+                Position = slot.Position,
+                Type = "launchApplication",
+                ApplicationPath = launch.ApplicationPath,
+            },
+            OpenUrlAction openUrl => new ActionDto
+            {
+                Position = slot.Position,
+                Type = "openUrl",
+                Url = openUrl.Url,
+            },
+            _ => throw new NotSupportedException(
+                $"El tipo de acción '{slot.Action?.GetType().Name}' en la posición {slot.Position} " +
+                "no está soportado por la persistencia."),
+        };
+    }
 }
 
 internal sealed class PageDto
@@ -65,13 +74,10 @@ internal sealed class PageDto
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public List<int>? SlotPositions { get; set; }
-    /// <summary>
-    /// Null en archivos de esquema versión 1 (donde no existía este campo).
-    /// Obligatorio y validado al leer esquema versión 2.
-    /// </summary>
     public List<ActionDto>? Actions { get; set; }
+    public List<SlotColorDto>? SlotColors { get; set; }
 }
-// Se agrega, nueva clase en el mismo archivo:
+
 internal sealed class ActionDto
 {
     public ActionDto()
@@ -86,4 +92,14 @@ internal sealed class ActionDto
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Url { get; set; }
+}
+
+internal sealed class SlotColorDto
+{
+    public SlotColorDto()
+    {
+    }
+
+    public int Position { get; set; }
+    public string? ColorHex { get; set; }
 }

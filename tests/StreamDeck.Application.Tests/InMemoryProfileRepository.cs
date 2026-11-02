@@ -52,7 +52,6 @@ internal sealed class InMemoryProfileRepository : IProfileRepository
         return Task.CompletedTask;
     }
 
-    // Ahora
     private static Profile Clone(Profile profile)
     {
         var pages = profile.Pages.Select(p => (
@@ -69,6 +68,11 @@ internal sealed class InMemoryProfileRepository : IProfileRepository
             foreach (var originalSlot in originalPage.Slots)
             {
                 var clonedSlot = clonedPage.Slots.First(s => s.Position == originalSlot.Position);
+
+                if (originalSlot.ColorHex is not null)
+                {
+                    clonedSlot.SetColor(originalSlot.ColorHex);
+                }
 
                 switch (originalSlot.Action)
                 {

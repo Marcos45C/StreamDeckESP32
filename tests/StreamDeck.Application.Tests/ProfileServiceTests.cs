@@ -492,6 +492,54 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public async Task SetButtonColorAsync_SetsColorAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.SetButtonColorAsync(profile.Id, profile.Pages[0].Id, 1, "#2F5F91");
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        Assert.Equal("#2F5F91", persisted!.Pages[0].Slots[0].ColorHex);
+    }
+
+    [Fact]
+    public async Task SetButtonColorAsync_WithInvalidColor_DoesNotCallSave()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.SetButtonColorAsync(profile.Id, profile.Pages[0].Id, 1, "blue"));
+
+        Assert.Equal(saveCountBefore, repository.SaveCallCount);
+    }
+
+    [Fact]
+    public async Task ClearButtonColorAsync_RemovesColorAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].SetColor("#2F5F91");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.ClearButtonColorAsync(profile.Id, profile.Pages[0].Id, 1);
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        Assert.Null(persisted!.Pages[0].Slots[0].ColorHex);
+    }
+
+    [Fact]
     public async Task ClearButtonActionAsync_RemovesActionAndPersists()
     {
         var repository = new InMemoryProfileRepository();

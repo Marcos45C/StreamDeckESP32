@@ -87,6 +87,8 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearButtonColorCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -99,6 +101,8 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearButtonColorCommand))]
     public partial Profile? SelectedProfile { get; set; }
 
     [ObservableProperty]
@@ -109,6 +113,8 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearButtonColorCommand))]
     public partial Page? SelectedPage { get; set; }
 
     [ObservableProperty]
@@ -116,6 +122,8 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ClearButtonColorCommand))]
     public partial ButtonSlot? SelectedButtonSlot { get; set; }
 
     [ObservableProperty]
@@ -146,6 +154,22 @@ public partial class MainViewModel : ViewModelBase
     public ObservableCollection<Page> Pages { get; } = new();
 
     public ObservableCollection<string> AvailablePorts { get; } = new();
+
+    public IReadOnlyList<ButtonColorOption> ButtonColorOptions { get; } = new[]
+    {
+        new ButtonColorOption("Azul", "#2F5F91"),
+        new ButtonColorOption("Verde", "#28664D"),
+        new ButtonColorOption("Violeta", "#64468C"),
+        new ButtonColorOption("Naranja", "#8B512C"),
+        new ButtonColorOption("Rojo", "#813B43"),
+        new ButtonColorOption("Amarillo", "#786622"),
+        new ButtonColorOption("Turquesa", "#28666A"),
+        new ButtonColorOption("Gris", "#454B57"),
+    };
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
+    public partial ButtonColorOption? SelectedButtonColorOption { get; set; }
 
     public Func<string?, Task<string?>>? RequestProfileNameAsync { get; set; }
 
@@ -199,6 +223,8 @@ public partial class MainViewModel : ViewModelBase
     };
 
     public bool HasButtonAction => SelectedButtonSlot?.Action is not null;
+
+    public bool HasSelectedButtonColor => SelectedButtonSlot?.ColorHex is not null;
 
     public string ConfiguredActionDetailsText => SelectedButtonSlot?.Action switch
     {
@@ -540,7 +566,7 @@ public partial class MainViewModel : ViewModelBase
         await RunExclusiveAsync(async () =>
         {
             await _profileService.AssignApplicationActionAsync(profileId, pageId, position, newPath, CancellationToken.None);
-            await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
         }, "No se pudo asignar la aplicación");
     }
 
@@ -571,9 +597,56 @@ public partial class MainViewModel : ViewModelBase
         {
             await _profileService.AssignOpenUrlActionAsync(
                 profileId, pageId, position, newUrl, CancellationToken.None);
-            await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
         }, "No se pudo asignar la URL");
     }
+
+    [RelayCommand(CanExecute = nameof(CanApplyButtonColor))]
+    private async Task ApplyButtonColorAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null || SelectedButtonColorOption is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+        var colorHex = SelectedButtonColorOption.HexCode;
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.SetButtonColorAsync(profileId, pageId, position, colorHex, CancellationToken.None);
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
+        }, "No se pudo cambiar el color del botón");
+    }
+
+    private bool CanApplyButtonColor() =>
+        !IsBusy && SelectedProfile is not null && SelectedPage is not null
+        && SelectedButtonSlot is not null && SelectedButtonColorOption is not null;
+
+    [RelayCommand(CanExecute = nameof(CanClearButtonColor))]
+    private async Task ClearButtonColorAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.ClearButtonColorAsync(profileId, pageId, position, CancellationToken.None);
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
+        }, "No se pudo restablecer el color del botón");
+    }
+
+    private bool CanClearButtonColor() =>
+        !IsBusy && SelectedProfile is not null && SelectedPage is not null
+        && SelectedButtonSlot?.ColorHex is not null;
 
     [RelayCommand(CanExecute = nameof(CanClearButtonAction))]
     private async Task ClearButtonActionAsync()
@@ -590,7 +663,7 @@ public partial class MainViewModel : ViewModelBase
         await RunExclusiveAsync(async () =>
         {
             await _profileService.ClearButtonActionAsync(profileId, pageId, position, CancellationToken.None);
-            await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
         }, "No se pudo quitar la acción");
     }
 
@@ -893,7 +966,7 @@ public partial class MainViewModel : ViewModelBase
         SelectedProfile = Profiles.FirstOrDefault(p => p.Id == profileIdToReselect);
     }
 
-    private async Task RefreshAfterButtonActionChangeAsync(Guid profileId, Guid pageId, int position)
+    private async Task RefreshAfterButtonSlotChangeAsync(Guid profileId, Guid pageId, int position)
     {
         var all = await _profileService.GetAllProfilesAsync(CancellationToken.None);
         ReplaceProfiles(all);
@@ -952,6 +1025,15 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedButtonSlotStatusText));
         OnPropertyChanged(nameof(HasButtonAction));
         OnPropertyChanged(nameof(ConfiguredActionDetailsText));
+        OnPropertyChanged(nameof(HasSelectedButtonColor));
+
+        SelectedButtonColorOption = value?.ColorHex is null
+            ? null
+            : ButtonColorOptions.FirstOrDefault(
+                option => string.Equals(option.HexCode, value.ColorHex, StringComparison.OrdinalIgnoreCase));
+
+        ApplyButtonColorCommand.NotifyCanExecuteChanged();
+        ClearButtonColorCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnDeviceStateChanged(DeviceConnectionState value)

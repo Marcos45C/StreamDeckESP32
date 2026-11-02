@@ -112,6 +112,35 @@ public sealed class ProfileService
         await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task SetButtonColorAsync(
+        Guid profileId,
+        Guid pageId,
+        int position,
+        string colorHex,
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await GetProfileOrThrowAsync(profileId, cancellationToken).ConfigureAwait(false);
+        var page = FindPageOrThrow(profile, pageId);
+        var slot = FindSlotOrThrow(page, position);
+
+        slot.SetColor(colorHex);
+        await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task ClearButtonColorAsync(
+        Guid profileId,
+        Guid pageId,
+        int position,
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await GetProfileOrThrowAsync(profileId, cancellationToken).ConfigureAwait(false);
+        var page = FindPageOrThrow(profile, pageId);
+        var slot = FindSlotOrThrow(page, position);
+
+        slot.ClearColor();
+        await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task ClearButtonActionAsync(
         Guid profileId, Guid pageId, int position, CancellationToken cancellationToken = default)
     {
