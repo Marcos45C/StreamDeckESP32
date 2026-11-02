@@ -11,4 +11,24 @@
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+
+    <!-- El icono vive a nivel de aplicación para permanecer visible
+         aunque la ventana principal esté minimizada. -->
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/streamdeck-icon.ico"
+                      ToolTipText="StreamDeck ESP32"
+                      Clicked="OnTrayIconClicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Mostrar StreamDeck ESP32"
+                                        Click="OnShowMainWindowClicked" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Salir"
+                                        Click="OnExitApplicationClicked" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
 </Application>

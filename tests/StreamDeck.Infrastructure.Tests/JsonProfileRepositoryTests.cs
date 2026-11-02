@@ -89,7 +89,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
 
-        Assert.Equal(5, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(profile.Id, root.GetProperty("id").GetGuid());
         Assert.Equal("Mi perfil", root.GetProperty("name").GetString());
 
@@ -100,6 +100,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         var actionsArray = pageElement.GetProperty("actions");
         Assert.Equal(0, actionsArray.GetArrayLength());
         Assert.Equal(0, pageElement.GetProperty("slotColors").GetArrayLength());
+        Assert.Equal(0, pageElement.GetProperty("slotNames").GetArrayLength());
         Assert.Equal(page.Id, pageElement.GetProperty("id").GetGuid());
         Assert.Equal("Página 1", pageElement.GetProperty("name").GetString());
 
@@ -300,7 +301,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion5()
+    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion6()
     {
         var id = Guid.NewGuid();
         var pageId = Guid.NewGuid();
@@ -318,7 +319,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
 
         var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{id}.json"));
 
-        Assert.Contains("\"schemaVersion\": 5", json);
+        Assert.Contains("\"schemaVersion\": 6", json);
         Assert.Contains("\"slotPositions\"", json);
         Assert.Contains("\"actions\"", json);
     }
@@ -629,6 +630,91 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
     }
 
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion5File_PreservesActionsAndColorsAndDefaultsNames()
+    {
+        var id = Guid.NewGuid();
+        var pageId = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 5,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [
+            {
+              "id": "{{pageId}}",
+              "name": "Página 1",
+              "slotPositions": [1,2,3,4,5,6,7,8,9],
+              "actions": [ { "position": 1, "type": "openUrl", "url": "https://example.com" } ],
+              "slotColors": [ { "position": 1, "colorHex": "#2F5F91" } ]
+            }
+          ]
+        }
+        """);
+
+        var loaded = await _repository.GetByIdAsync(id);
+
+        Assert.IsType<OpenUrlAction>(loaded!.Pages[0].Slots[0].Action);
+        Assert.Equal("#2F5F91", loaded.Pages[0].Slots[0].ColorHex);
+        Assert.Null(loaded.Pages[0].Slots[0].CustomName);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion6AndMissingSlotNames_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 6,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "name": "Página 1",
+              "slotPositions": [1,2,3,4,5,6,7,8,9],
+              "actions": [],
+              "slotColors": []
+            }
+          ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Theory]
+    [InlineData("[ { \"position\": 0, \"name\": \"Discord\" } ]")]
+    [InlineData("[ { \"position\": 10, \"name\": \"Discord\" } ]")]
+    [InlineData("[ { \"position\": 1, \"name\": \"   \" } ]")]
+    [InlineData("[ { \"position\": 1, \"name\": \"01234567890123456789012345\" } ]")]
+    [InlineData("[ { \"position\": 1, \"name\": \"Discord\" }, { \"position\": 1, \"name\": \"Browser\" } ]")]
+    [InlineData("[ { \"position\": 1 } ]")]
+    [InlineData("[ { \"position\": 1, \"name\": null } ]")]
+    public async Task GetByIdAsync_WithSchemaVersion6AndInvalidSlotNames_ThrowsInvalidDataException(string slotNamesJson)
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 6,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "name": "Página 1",
+              "slotPositions": [1,2,3,4,5,6,7,8,9],
+              "actions": [],
+              "slotColors": [],
+              "slotNames": {{slotNamesJson}}
+            }
+          ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
     private async Task WriteRawJsonAsync(Guid id, string json)
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -725,20 +811,21 @@ public sealed class JsonProfileRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WithButtonColors_WritesSchemaVersion5AndPreservesColors()
+    public async Task SaveAsync_WithButtonColors_WritesSchemaVersion6AndPreservesColors()
     {
         var profile = Profile.Create("Mi perfil");
         profile.Pages[0].Slots[0].SetColor("#2f5f91");
         profile.Pages[0].Slots[0].AssignAction(new OpenUrlAction("https://example.com"));
         profile.Pages[0].Slots[4].SetColor("#28664d");
         profile.Pages[0].Slots[4].AssignAction(new LaunchApplicationAction("/usr/bin/code"));
+        profile.Pages[0].Slots[0].SetCustomName("Navegador");
 
         await _repository.SaveAsync(profile);
         var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{profile.Id}.json"));
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
-        Assert.Equal(5, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
 
         var colors = root.GetProperty("pages")[0].GetProperty("slotColors");
         Assert.Equal(2, colors.GetArrayLength());
@@ -747,8 +834,14 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         Assert.Equal(5, colors[1].GetProperty("position").GetInt32());
         Assert.Equal("#28664D", colors[1].GetProperty("colorHex").GetString());
 
+        var names = root.GetProperty("pages")[0].GetProperty("slotNames");
+        Assert.Single(names.EnumerateArray());
+        Assert.Equal(1, names[0].GetProperty("position").GetInt32());
+        Assert.Equal("Navegador", names[0].GetProperty("name").GetString());
+
         var loaded = await _repository.GetByIdAsync(profile.Id);
-        Assert.Equal("#2F5F91", loaded!.Pages[0].Slots[0].ColorHex);
+        Assert.Equal("Navegador", loaded!.Pages[0].Slots[0].CustomName);
+        Assert.Equal("#2F5F91", loaded.Pages[0].Slots[0].ColorHex);
         Assert.Equal("#28664D", loaded.Pages[0].Slots[4].ColorHex);
         Assert.Null(loaded.Pages[0].Slots[1].ColorHex);
         Assert.IsType<OpenUrlAction>(loaded.Pages[0].Slots[0].Action);
@@ -761,6 +854,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
     [InlineData("[ { \"position\": 1, \"colorHex\": \"blue\" } ]")]
     [InlineData("[ { \"position\": 1, \"colorHex\": \"#2F5F91\" }, { \"position\": 1, \"colorHex\": \"#28664D\" } ]")]
     [InlineData("[ { \"position\": 1 } ]")]
+    [InlineData("[ { \"position\": 1, \"name\": null } ]")]
     [InlineData("[ { \"position\": 1, \"colorHex\": null } ]")]
     public async Task GetByIdAsync_WithSchemaVersion5AndInvalidSlotColors_ThrowsInvalidDataException(string slotColorsJson)
     {
@@ -845,7 +939,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         Assert.All(loaded.Pages[0].Slots, s => Assert.Null(s.Action));
     }
     [Fact]
-public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion5WithUrlAndNoApplicationPath()
+public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion6WithUrlAndNoApplicationPath()
 {
     var profile = Profile.Create("Mi perfil");
     profile.Pages[0].Slots[0].AssignAction(new OpenUrlAction("https://example.com"));
@@ -854,7 +948,9 @@ public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion5WithUrlAndNoAp
     var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{profile.Id}.json"));
 
     using var document = JsonDocument.Parse(json);
-    var actionElement = document.RootElement.GetProperty("pages")[0].GetProperty("actions")[0];
+    var root = document.RootElement;
+    Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
+    var actionElement = root.GetProperty("pages")[0].GetProperty("actions")[0];
 
     Assert.Equal("openUrl", actionElement.GetProperty("type").GetString());
     Assert.Equal("https://example.com", actionElement.GetProperty("url").GetString());

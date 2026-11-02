@@ -1,4 +1,4 @@
-﻿using StreamDeck.Application.Profiles;
+using StreamDeck.Application.Profiles;
 using StreamDeck.Domain.Entities;
 
 namespace StreamDeck.Application.Tests;
@@ -72,6 +72,11 @@ internal sealed class InMemoryProfileRepository : IProfileRepository
                 if (originalSlot.ColorHex is not null)
                 {
                     clonedSlot.SetColor(originalSlot.ColorHex);
+                }
+
+                if (originalSlot.CustomName is not null)
+                {
+                    clonedSlot.SetCustomName(originalSlot.CustomName);
                 }
 
                 switch (originalSlot.Action)

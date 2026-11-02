@@ -4,7 +4,7 @@ Aplicación de escritorio para configurar y administrar un **Stream Deck físico
 
 La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como un dispositivo de entrada: detecta las pulsaciones y envía la posición del botón por USB/serie. No es un Stream Deck virtual y el firmware no almacena las configuraciones.
 
-> Estado del proyecto: la conexión serie, las nueve pulsaciones y las acciones de aplicaciones/URLs ya fueron probadas en Fedora KDE con una placa ESP32 DevKit V1 / ESP-WROOM-32 con CP2102. La paleta de colores y la migración JSON v5 se incluyen en esta actualización y quedan pendientes de compilación y prueba local. La validación en otros equipos Windows también está pendiente.
+> Estado del proyecto: la conexión serie, las nueve pulsaciones, las acciones de aplicaciones/URLs y la paleta de colores ya fueron probadas en Fedora KDE con una placa ESP32 DevKit V1 / ESP-WROOM-32 con CP2102. La minimización a la bandeja del sistema ya fue probada en Fedora KDE y Windows.
 
 ## Funcionalidades implementadas
 
@@ -15,13 +15,25 @@ La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como 
 - Acción **Abrir URL**, limitada a direcciones HTTP y HTTPS.
 - Prueba manual de una acción desde la aplicación.
 - Ocho colores configurables por botón, independientes de la acción asignada.
+- Nombre personalizado por botón: doble clic sobre un botón para editarlo o restablecer el nombre predeterminado.
+- Minimización a la bandeja del sistema: la ventana desaparece de la barra de tareas y permanece ejecutándose en segundo plano.
+- Icono propio en la bandeja con opciones para restaurar la ventana o salir de la aplicación.
 - Persistencia local de perfiles en archivos JSON.
-- Compatibilidad de lectura con los esquemas JSON anteriores (v1 a v4); los guardados actuales utilizan el esquema v5.
+- Compatibilidad de lectura con los esquemas JSON anteriores (v1 a v5); los guardados actuales utilizan el esquema v6.
 - Detección del puerto serie, conexión, handshake y recepción de las nueve pulsaciones físicas.
 - Ejecución de la acción correspondiente al perfil y página seleccionados cuando se pulsa un botón físico.
 - Interfaz de escritorio multiplataforma con tema oscuro.
 
-Los colores son únicamente visuales dentro de la aplicación de escritorio. El hardware actual no tiene pantalla ni LEDs direccionables, y no se necesita agregar componentes para utilizar el proyecto.
+Los nombres y colores son únicamente visuales dentro de la aplicación de escritorio. El hardware actual no tiene pantalla ni LEDs direccionables, y no se necesita agregar componentes para utilizar el proyecto.
+
+### Bandeja del sistema y ejecución en segundo plano
+
+Al minimizar la ventana, StreamDeck ESP32 oculta su entrada de la barra de tareas y mantiene la aplicación ejecutándose. Para volver a abrirla, hacé clic en el icono de StreamDeck ESP32 de la bandeja del sistema o utilizá la opción **Mostrar StreamDeck ESP32** del menú del icono. La opción **Salir** cierra la aplicación; si el ESP32 está conectado, se realiza primero la desconexión ordenada.
+
+- **Windows:** el icono aparece en el área de notificaciones. Windows decide si lo muestra directamente o dentro del panel de **iconos ocultos**; esa ubicación se puede ajustar desde la configuración de la barra de tareas.
+- **Fedora KDE Plasma:** el icono utiliza la bandeja del sistema de Plasma. En otros escritorios Linux, la disponibilidad depende del soporte de StatusNotifierItem/AppIndicator del entorno de escritorio.
+
+El botón **Cerrar (X)** de la ventana mantiene su comportamiento actual de salida de la aplicación. Para dejarla en segundo plano, utilizá **Minimizar**.
 
 ## Hardware actual
 
@@ -172,10 +184,10 @@ En Windows, el directorio habitual es:
 
 En Linux, la ubicación se determina mediante `Environment.SpecialFolder.ApplicationData` y normalmente queda bajo la carpeta de configuración del usuario.
 
-Los perfiles pueden respaldarse copiando esa carpeta. Tené presente que las rutas de ejecutables son específicas de cada sistema operativo: una ruta configurada en Fedora no necesariamente existe en Windows. Las URLs y los colores no dependen de esas rutas.
+Los perfiles pueden respaldarse copiando esa carpeta. Tené presente que las rutas de ejecutables son específicas de cada sistema operativo: una ruta configurada en Fedora no necesariamente existe en Windows. Las URLs, los colores y los nombres personalizados no dependen de esas rutas.
 
 ## Alcance actual y próximos pasos
 
 El hardware se mantiene intencionalmente simple: nueve pulsadores conectados al ESP32, sin pantalla, sin LEDs y sin necesidad de una placa distinta. Las mejoras visuales actuales pertenecen al software de escritorio.
 
-No se implementaron todavía instaladores MSI/EXE, actualización automática, sincronización en la nube, macros ni imágenes personalizadas para los botones.
+No se implementaron todavía instaladores MSI/EXE, actualización automática, sincronización en la nube, macros, combinaciones de teclas ni imágenes personalizadas para los botones.

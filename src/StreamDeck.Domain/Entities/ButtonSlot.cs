@@ -16,6 +16,14 @@ public sealed class ButtonSlot
     /// </summary>
     public string? ColorHex { get; private set; }
 
+    /// <summary>
+    /// Nombre personalizado opcional que se muestra en la cuadrícula de escritorio.
+    /// No cambia la acción asignada ni la posición física del botón.
+    /// </summary>
+    public string? CustomName { get; private set; }
+
+    public bool HasCustomName => CustomName is not null;
+
     internal ButtonSlot(int position)
     {
         Position = position;
@@ -52,5 +60,27 @@ public sealed class ButtonSlot
     public void ClearColor()
     {
         ColorHex = null;
+    }
+
+    public void SetCustomName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("El nombre del botón no puede estar vacío.", nameof(name));
+        }
+
+        var normalized = name.Trim();
+
+        if (normalized.Length > 24)
+        {
+            throw new ArgumentException("El nombre del botón no puede superar los 24 caracteres.", nameof(name));
+        }
+
+        CustomName = normalized;
+    }
+
+    public void ClearCustomName()
+    {
+        CustomName = null;
     }
 }

@@ -492,6 +492,39 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public async Task SetButtonNameAsync_SetsNameAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.SetButtonNameAsync(profile.Id, profile.Pages[0].Id, 1, "Discord");
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        Assert.Equal("Discord", persisted!.Pages[0].Slots[0].CustomName);
+    }
+
+    [Fact]
+    public async Task ClearButtonNameAsync_RemovesNameAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].SetCustomName("Discord");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await service.ClearButtonNameAsync(profile.Id, profile.Pages[0].Id, 1);
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        Assert.Null(persisted!.Pages[0].Slots[0].CustomName);
+    }
+
+    [Fact]
     public async Task SetButtonColorAsync_SetsColorAndPersists()
     {
         var repository = new InMemoryProfileRepository();

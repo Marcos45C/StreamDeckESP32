@@ -181,6 +181,8 @@ public partial class MainViewModel : ViewModelBase
 
     public Func<string?, Task<string?>>? RequestUrlAsync { get; set; }
 
+    public Func<string?, Task<string?>>? RequestButtonNameAsync { get; set; }
+
     public bool HasSelectedProfile => SelectedProfile is not null;
 
     public string CenterEmptyStateTitle => SelectedProfile is not null
@@ -200,7 +202,9 @@ public partial class MainViewModel : ViewModelBase
     public bool HasSelectedButtonSlot => SelectedButtonSlot is not null;
 
     public string SelectedButtonSlotTitle => SelectedButtonSlot is not null
-        ? $"Botón {SelectedButtonSlot.Position}"
+        ? SelectedButtonSlot.CustomName is { Length: > 0 } name
+            ? $"{name} · Botón {SelectedButtonSlot.Position}"
+            : $"Botón {SelectedButtonSlot.Position}"
         : string.Empty;
 
     public string SelectedButtonSlotPositionText => SelectedButtonSlot is not null
@@ -599,6 +603,40 @@ public partial class MainViewModel : ViewModelBase
                 profileId, pageId, position, newUrl, CancellationToken.None);
             await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
         }, "No se pudo asignar la URL");
+    }
+
+    [RelayCommand]
+    private async Task RenameButtonSlotAsync(ButtonSlot? slot)
+    {
+        if (slot is null || SelectedProfile is null || SelectedPage is null ||
+            RequestButtonNameAsync is null || IsBusy)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = slot.Position;
+        var newName = await RequestButtonNameAsync(slot.CustomName);
+
+        if (newName is null)
+        {
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                await _profileService.ClearButtonNameAsync(profileId, pageId, position, CancellationToken.None);
+            }
+            else
+            {
+                await _profileService.SetButtonNameAsync(profileId, pageId, position, newName, CancellationToken.None);
+            }
+
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
+        }, "No se pudo cambiar el nombre del botón");
     }
 
     [RelayCommand(CanExecute = nameof(CanApplyButtonColor))]

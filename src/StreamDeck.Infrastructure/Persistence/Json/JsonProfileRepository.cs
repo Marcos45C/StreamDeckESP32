@@ -12,6 +12,7 @@ public sealed class JsonProfileRepository : IProfileRepository
 
     private const int SchemaVersionWithMultipleActionTypes = 4;
     private const int SchemaVersionWithButtonColors = 5;
+    private const int SchemaVersionWithButtonNames = 6;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -148,13 +149,14 @@ public sealed class JsonProfileRepository : IProfileRepository
             && dto.SchemaVersion != SchemaVersionWithSlots
             && dto.SchemaVersion != SchemaVersionWithActions
             && dto.SchemaVersion != SchemaVersionWithMultipleActionTypes
-            && dto.SchemaVersion != SchemaVersionWithButtonColors)
+            && dto.SchemaVersion != SchemaVersionWithButtonColors
+            && dto.SchemaVersion != SchemaVersionWithButtonNames)
         {
             throw new InvalidDataException(
                 $"El archivo de perfil '{filePath}' usa la versión de esquema {dto.SchemaVersion}, " +
                 "que no es compatible con las versiones soportadas " +
                 $"({SchemaVersionWithoutSlots}, {SchemaVersionWithSlots}, {SchemaVersionWithActions}, " +
-                $"{SchemaVersionWithMultipleActionTypes} o {SchemaVersionWithButtonColors}).");
+                $"{SchemaVersionWithMultipleActionTypes}, {SchemaVersionWithButtonColors} o {SchemaVersionWithButtonNames}).");
         }
 
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
@@ -218,6 +220,11 @@ public sealed class JsonProfileRepository : IProfileRepository
             if (dto.SchemaVersion >= SchemaVersionWithButtonColors)
             {
                 ApplySlotColors(profile, dto.Pages, filePath);
+            }
+
+            if (dto.SchemaVersion >= SchemaVersionWithButtonNames)
+            {
+                ApplySlotNames(profile, dto.Pages, filePath);
             }
 
             return profile;
@@ -323,6 +330,64 @@ public sealed class JsonProfileRepository : IProfileRepository
                     throw new InvalidDataException(
                         $"El archivo de perfil '{filePath}' contiene un color inválido en la posición " +
                         $"{colorDto.Position} de la página '{pageDto.Id}': {ex.Message}", ex);
+                }
+            }
+        }
+    }
+
+
+    private static void ApplySlotNames(Profile profile, List<PageDto> pageDtos, string filePath)
+    {
+        foreach (var pageDto in pageDtos)
+        {
+            if (pageDto!.SlotNames is null)
+            {
+                throw new InvalidDataException(
+                    $"El archivo de perfil '{filePath}' contiene una página ('{pageDto.Id}') sin 'slotNames', " +
+                    "requerido en la versión de esquema 6.");
+            }
+
+            if (pageDto.SlotNames.Any(name => name is null))
+            {
+                throw new InvalidDataException(
+                    $"El archivo de perfil '{filePath}' contiene un nombre nulo en la página '{pageDto.Id}'.");
+            }
+
+            var page = profile.Pages.First(p => p.Id == pageDto.Id);
+            var seenPositions = new HashSet<int>();
+
+            foreach (var nameDto in pageDto.SlotNames)
+            {
+                if (nameDto!.Position < 1 || nameDto.Position > Page.SlotCount)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene un nombre con posición inválida " +
+                        $"({nameDto.Position}) en la página '{pageDto.Id}'.");
+                }
+
+                if (!seenPositions.Add(nameDto.Position))
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene más de un nombre para la posición " +
+                        $"{nameDto.Position} en la página '{pageDto.Id}'.");
+                }
+
+                if (nameDto.Name is null)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene un nombre sin 'name' " +
+                        $"en la posición {nameDto.Position} de la página '{pageDto.Id}'.");
+                }
+
+                try
+                {
+                    page.Slots.First(slot => slot.Position == nameDto.Position).SetCustomName(nameDto.Name);
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene un nombre inválido en la posición " +
+                        $"{nameDto.Position} de la página '{pageDto.Id}': {ex.Message}", ex);
                 }
             }
         }

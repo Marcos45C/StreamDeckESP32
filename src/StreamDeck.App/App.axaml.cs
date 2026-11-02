@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using StreamDeck.App.ViewModels;
@@ -14,6 +14,7 @@ namespace StreamDeck.App;
 
 public partial class App : Avalonia.Application
 {
+    private MainWindow? _mainWindow;
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -31,12 +32,36 @@ public partial class App : Avalonia.Application
                 profileRepository, applicationLauncher, urlLauncher);
             var deviceConnection = new SerialDeviceConnection();
 
-            desktop.MainWindow = new MainWindow
+            _mainWindow = new MainWindow
             {
                 DataContext = new MainViewModel(profileService, buttonActionExecutionService, deviceConnection),
             };
+
+            desktop.MainWindow = _mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void OnTrayIconClicked(object? sender, EventArgs e)
+    {
+        RestoreMainWindow();
+    }
+
+    private void OnShowMainWindowClicked(object? sender, EventArgs e)
+    {
+        RestoreMainWindow();
+    }
+
+    private void OnExitApplicationClicked(object? sender, EventArgs e)
+    {
+        // Utiliza el cierre normal de la ventana para que se ejecute
+        // la desconexión ordenada del ESP32 cuando corresponda.
+        _mainWindow?.Close();
+    }
+
+    private void RestoreMainWindow()
+    {
+        _mainWindow?.RestoreFromTray();
     }
 }

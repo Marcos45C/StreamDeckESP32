@@ -4,7 +4,7 @@
 
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
-| `StreamDeck.Domain` | Perfiles, páginas, posiciones de botones, acciones y colores configurables. Contiene las reglas y validaciones del dominio. | Ninguno interno |
+| `StreamDeck.Domain` | Perfiles, páginas, posiciones de botones, acciones, colores y nombres personalizados. Contiene las reglas y validaciones del dominio. | Ninguno interno |
 | `StreamDeck.Application` | Casos de uso para perfiles y páginas, configuración de acciones y colores, ejecución de acciones e interfaces para los servicios externos. | Domain |
 | `StreamDeck.Infrastructure` | Persistencia JSON local y adaptadores del sistema operativo para ejecutar aplicaciones y abrir URLs. | Application, Domain |
 | `StreamDeck.Device` | Enumeración, conexión y comunicación serie con el firmware ESP32. | Application, Domain |
@@ -16,11 +16,11 @@ No hay dependencias circulares. `Domain` es la única capa sin dependencias inte
 
 - `Domain/Entities/Profile.cs`: perfil y administración de páginas.
 - `Domain/Entities/Page.cs`: página con nueve posiciones fijas.
-- `Domain/Entities/ButtonSlot.cs`: posición, acción opcional y color visual opcional (`#RRGGBB`).
+- `Domain/Entities/ButtonSlot.cs`: posición, acción opcional, color visual opcional (`#RRGGBB`) y nombre personalizado opcional.
 - `Domain/Entities/ButtonAction.cs`: tipo base de acción.
 - `Domain/Entities/LaunchApplicationAction.cs`: ruta de una aplicación.
 - `Domain/Entities/OpenUrlAction.cs`: URL absoluta HTTP/HTTPS.
-- `Application/Profiles/ProfileService.cs`: operaciones y persistencia de perfiles, acciones y colores.
+- `Application/Profiles/ProfileService.cs`: operaciones y persistencia de perfiles, acciones, colores y nombres de botones.
 - `Application/Execution/ButtonActionExecutionService.cs`: resuelve y ejecuta la acción asignada a una posición.
 - `Infrastructure/Persistence/Json/JsonProfileRepository.cs`: lectura y escritura atómica de archivos JSON.
 - `Infrastructure/Execution/`: apertura de aplicaciones y URLs en el sistema operativo.
@@ -29,7 +29,7 @@ No hay dependencias circulares. `Domain` es la única capa sin dependencias inte
 
 ## Persistencia JSON
 
-Cada perfil se guarda en un archivo independiente. El repositorio escribe actualmente `schemaVersion: 5`.
+Cada perfil se guarda en un archivo independiente. El repositorio escribe actualmente `schemaVersion: 6`.
 
 | Versión | Contenido agregado |
 |---:|---|
@@ -38,8 +38,9 @@ Cada perfil se guarda en un archivo independiente. El repositorio escribe actual
 | 3 | Acciones `launchApplication`. |
 | 4 | Acciones `openUrl` además de aplicaciones. |
 | 5 | Colores visuales opcionales para cada posición. |
+| 6 | Nombres personalizados opcionales para cada botón. |
 
-El repositorio mantiene lectura compatible con v1 a v4. Leer un archivo antiguo no lo modifica; al guardar ese perfil se escribe el esquema v5.
+El repositorio mantiene lectura compatible con v1 a v5. Leer un archivo antiguo no lo modifica; al guardar ese perfil se escribe el esquema v6.
 
 ## MVVM y composición
 
@@ -60,6 +61,11 @@ Todos los proyectos C# apuntan a `net10.0`. `Directory.Build.props` centraliza `
 
 ## Pruebas
 
-- `StreamDeck.Domain.Tests`: reglas de perfiles, páginas, botones, acciones y colores.
-- `StreamDeck.Application.Tests`: casos de uso con repositorio en memoria y lanzadores simulados.
+- `StreamDeck.Domain.Tests`: reglas de perfiles, páginas, botones, acciones, colores y nombres personalizados.
+- `StreamDeck.Application.Tests`: casos de uso con repositorio en memoria y lanzadores simulados, incluyendo configuración de nombres personalizados.
 - `StreamDeck.Infrastructure.Tests`: persistencia JSON, migraciones y validaciones de esquemas.
+
+
+### Personalización visual de botones
+
+Cada `ButtonSlot` puede conservar un color hexadecimal y un nombre personalizado opcional. Los nombres se guardan en `slotNames` dentro del esquema JSON v6; los archivos v1–v5 siguen leyéndose y sus botones comienzan sin nombre personalizado. Esta personalización es exclusivamente visual y no cambia la posición física ni la acción del botón.

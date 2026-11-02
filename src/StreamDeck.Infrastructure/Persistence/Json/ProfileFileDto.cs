@@ -18,7 +18,7 @@ internal sealed class ProfileFileDto
     {
         return new ProfileFileDto
         {
-            SchemaVersion = 5,
+            SchemaVersion = 6,
             Id = profile.Id,
             Name = profile.Name,
             Pages = profile.Pages.Select(page => new PageDto
@@ -36,6 +36,14 @@ internal sealed class ProfileFileDto
                     {
                         Position = slot.Position,
                         ColorHex = slot.ColorHex,
+                    })
+                    .ToList(),
+                SlotNames = page.Slots
+                    .Where(slot => slot.CustomName is not null)
+                    .Select(slot => new SlotNameDto
+                    {
+                        Position = slot.Position,
+                        Name = slot.CustomName,
                     })
                     .ToList(),
             }).ToList(),
@@ -76,6 +84,7 @@ internal sealed class PageDto
     public List<int>? SlotPositions { get; set; }
     public List<ActionDto>? Actions { get; set; }
     public List<SlotColorDto>? SlotColors { get; set; }
+    public List<SlotNameDto>? SlotNames { get; set; }
 }
 
 internal sealed class ActionDto
@@ -102,4 +111,14 @@ internal sealed class SlotColorDto
 
     public int Position { get; set; }
     public string? ColorHex { get; set; }
+}
+
+internal sealed class SlotNameDto
+{
+    public SlotNameDto()
+    {
+    }
+
+    public int Position { get; set; }
+    public string? Name { get; set; }
 }

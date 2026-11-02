@@ -78,6 +78,7 @@ Si el CP2102 aparece como dispositivo desconocido o no se crea ningún puerto CO
 
 - **Abrir URL:** configurá una dirección `https://` y probá la acción; Windows la abrirá con el navegador predeterminado.
 - **Ejecutar aplicación:** seleccioná un ejecutable de Windows (`.exe`). No reutilices rutas de Fedora como `/usr/bin/firefox`.
+- **Bandeja del sistema:** minimizá la ventana y verificá que desaparezca de la barra de tareas. El icono de StreamDeck ESP32 debe quedar en el área de notificaciones o dentro del panel de iconos ocultos. Desde su menú, elegí **Mostrar StreamDeck ESP32** para restaurar la ventana o **Salir** para cerrar la aplicación.
 - **Colores:** asigná un color desde la paleta de propiedades. El color se guarda en el perfil y es visual solamente; no necesita soporte adicional del ESP32.
 
 Los perfiles de Windows se almacenan bajo:

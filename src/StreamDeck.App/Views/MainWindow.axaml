@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="650"
         x:Class="StreamDeck.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/streamdeck-icon.ico"
         Title="StreamDeck ESP32"
         Width="1100" Height="650"
         MinWidth="760" MinHeight="480"
@@ -363,6 +363,7 @@
                                     <ListBox.ItemTemplate>
                                         <DataTemplate x:DataType="entities:ButtonSlot">
                                             <Border Background="{Binding ColorHex, Converter={x:Static converters:ButtonSlotColorBrushConverter.Instance}}"
+                                                    DoubleTapped="OnButtonSlotDoubleTapped"
                                                     CornerRadius="6"
                                                     Padding="8"
                                                     HorizontalAlignment="Stretch"
@@ -373,6 +374,14 @@
                                                                FontWeight="SemiBold"
                                                                HorizontalAlignment="Center"
                                                                Foreground="{StaticResource TextPrimaryBrush}" />
+                                                    <TextBlock Text="{Binding CustomName}"
+                                                               FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               HorizontalAlignment="Center"
+                                                               MaxWidth="110"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               IsVisible="{Binding HasCustomName}" />
                                                     <TextBlock Text="{Binding Action, Converter={x:Static converters:ButtonActionStatusConverter.Instance}}"
                                                                FontSize="10.5"
                                                                HorizontalAlignment="Center"
@@ -412,6 +421,7 @@
                             <TextBlock Text="{Binding SelectedButtonSlotPositionText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotRowText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotColumnText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="Doble clic en un botón para cambiar su nombre" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
                             <TextBlock Text="{Binding SelectedButtonSlotStatusText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0" />
                             <TextBlock Text="{Binding ConfiguredActionDetailsText}"
                                        FontSize="11.5"

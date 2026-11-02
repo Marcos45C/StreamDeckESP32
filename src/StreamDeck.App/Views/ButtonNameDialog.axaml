@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="StreamDeck.App.Views.ButtonNameDialog"
+        Width="390" Height="178"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E22">
+    <Grid RowDefinitions="Auto,Auto,*" Margin="20">
+        <TextBlock Grid.Row="0"
+                   Text="Nombre del acceso rápido"
+                   Foreground="#E4E4E7"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,6" />
+        <StackPanel Grid.Row="1" Spacing="5">
+            <TextBox Name="NameTextBox"
+                     Foreground="#E4E4E7"
+                     Background="#18181B"
+                     BorderBrush="#2B2B30"
+                     MaxLength="24"
+                     Watermark="Ej.: Discord, Navegador, Captura…"
+                     KeyDown="OnTextBoxKeyDown" />
+            <TextBlock Text="Máximo 24 caracteres. Dejá un nombre corto para que entre en el botón."
+                       Foreground="#8E8E96"
+                       FontSize="10.5"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Spacing="8">
+            <Button Content="Restablecer" Click="OnResetClick" />
+            <Button Content="Cancelar" Click="OnCancelClick" />
+            <Button Content="Guardar" Click="OnSaveClick" />
+        </StackPanel>
+    </Grid>
+</Window>
