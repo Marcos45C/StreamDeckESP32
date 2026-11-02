@@ -1,24 +1,37 @@
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StreamDeck.Application.Device;
+using StreamDeck.Application.Execution;
 using StreamDeck.Application.Profiles;
 using StreamDeck.Domain.Entities;
-using StreamDeck.Application.Execution;
+
 namespace StreamDeck.App.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
-    // Ahora
     private readonly ProfileService _profileService;
     private readonly ButtonActionExecutionService _buttonActionExecutionService;
+    private readonly IDeviceConnection _deviceConnection;
 
-    public MainViewModel(ProfileService profileService, ButtonActionExecutionService buttonActionExecutionService)
+    public MainViewModel(
+        ProfileService profileService,
+        ButtonActionExecutionService buttonActionExecutionService,
+        IDeviceConnection deviceConnection)
     {
         ArgumentNullException.ThrowIfNull(profileService);
         ArgumentNullException.ThrowIfNull(buttonActionExecutionService);
+        ArgumentNullException.ThrowIfNull(deviceConnection);
+
         _profileService = profileService;
         _buttonActionExecutionService = buttonActionExecutionService;
+        _deviceConnection = deviceConnection;
 
+        _deviceConnection.StateChanged += HandleDeviceConnectionStateChanged;
+        _deviceConnection.ButtonPressed += HandleDeviceButtonPressed;
+
+        RefreshPortsCommand.Execute(null);
         LoadProfilesCommand.Execute(null);
     }
 
@@ -27,9 +40,6 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial string CurrentSectionName { get; set; } = "Perfiles";
-
-    [ObservableProperty]
-    public partial string DeviceStatusText { get; set; } = "Desconectado";
 
     [ObservableProperty]
     public partial string PropertiesEmptyStateTitle { get; set; } = "Propiedades";
@@ -84,9 +94,33 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial string? ErrorMessage { get; set; }
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DisconnectDeviceCommand))]
+    public partial bool IsDeviceBusy { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DisconnectDeviceCommand))]
+    public partial bool IsDisconnecting { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DisconnectDeviceCommand))]
+    public partial DeviceConnectionState DeviceState { get; set; } = DeviceConnectionState.Disconnected;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
+    public partial string? SelectedPort { get; set; }
+
+    [ObservableProperty]
+    public partial int? LastButtonPressedPosition { get; set; }
+
     public ObservableCollection<Profile> Profiles { get; } = new();
 
     public ObservableCollection<Page> Pages { get; } = new();
+
+    public ObservableCollection<string> AvailablePorts { get; } = new();
 
     public Func<string?, Task<string?>>? RequestProfileNameAsync { get; set; }
 
@@ -141,6 +175,21 @@ public partial class MainViewModel : ViewModelBase
     public string ConfiguredApplicationPathText => SelectedButtonSlot?.Action is LaunchApplicationAction launch
         ? $"Ruta: {launch.ApplicationPath}"
         : string.Empty;
+
+    public string DeviceStatusText => DeviceState switch
+    {
+        DeviceConnectionState.Disconnected => "Desconectado",
+        DeviceConnectionState.Connecting => "Conectando…",
+        DeviceConnectionState.Connected => "Conectado",
+        DeviceConnectionState.Error => "Error de conexión",
+        _ => "Desconectado",
+    };
+
+    public bool IsDeviceConnected => DeviceState == DeviceConnectionState.Connected;
+
+    public string LastButtonPressedText => LastButtonPressedPosition is int position
+        ? $"Último botón recibido: {position}"
+        : "Esperando pulsaciones...";
 
     // ---------- Perfiles ----------
 
@@ -485,6 +534,10 @@ public partial class MainViewModel : ViewModelBase
             await RefreshAfterButtonActionChangeAsync(profileId, pageId, position);
         }, "No se pudo quitar la acción");
     }
+
+    private bool CanClearButtonAction() =>
+        !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null && HasButtonAction;
+
     [RelayCommand(CanExecute = nameof(CanExecuteSelectedButtonAction))]
     private async Task ExecuteSelectedButtonActionAsync()
     {
@@ -512,8 +565,113 @@ public partial class MainViewModel : ViewModelBase
         !IsBusy && SelectedProfile is not null && SelectedPage is not null
         && SelectedButtonSlot?.Action is LaunchApplicationAction;
 
-    private bool CanClearButtonAction() =>
-        !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null && HasButtonAction;
+    // ---------- Conexión con el dispositivo ----------
+
+    [RelayCommand]
+    private void RefreshPorts()
+    {
+        var ports = _deviceConnection.GetAvailablePortNames();
+        var previousSelection = SelectedPort;
+
+        AvailablePorts.Clear();
+        foreach (var port in ports)
+        {
+            AvailablePorts.Add(port);
+        }
+
+        SelectedPort = previousSelection is not null && AvailablePorts.Contains(previousSelection)
+            ? previousSelection
+            : AvailablePorts.FirstOrDefault();
+    }
+
+    private bool CanConnectDevice() =>
+        !IsDeviceBusy && !IsDisconnecting && !string.IsNullOrWhiteSpace(SelectedPort) &&
+        (DeviceState == DeviceConnectionState.Disconnected || DeviceState == DeviceConnectionState.Error);
+
+    [RelayCommand(CanExecute = nameof(CanConnectDevice))]
+    private async Task ConnectDeviceAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedPort))
+        {
+            return;
+        }
+
+        IsDeviceBusy = true;
+        ErrorMessage = null;
+
+        try
+        {
+            await _deviceConnection.ConnectAsync(SelectedPort, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // La conexión fue cancelada intencionalmente, por ejemplo al desconectar.
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"No se pudo conectar con el dispositivo: {ex.Message}";
+        }
+        finally
+        {
+            IsDeviceBusy = false;
+        }
+    }
+
+    private bool CanDisconnectDevice() =>
+        !IsDisconnecting &&
+        (DeviceState == DeviceConnectionState.Connected || DeviceState == DeviceConnectionState.Connecting);
+
+    [RelayCommand(CanExecute = nameof(CanDisconnectDevice))]
+    private async Task DisconnectDeviceAsync()
+    {
+        IsDisconnecting = true;
+
+        try
+        {
+            await _deviceConnection.DisconnectAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"No se pudo desconectar correctamente: {ex.Message}";
+        }
+        finally
+        {
+            IsDisconnecting = false;
+        }
+    }
+
+    public async Task DisconnectDeviceForShutdownAsync()
+    {
+        try
+        {
+            await _deviceConnection.DisconnectAsync();
+        }
+        catch
+        {
+            // Mejor esfuerzo durante el cierre: no bloquear el apagado de la app por esto.
+        }
+    }
+
+    private void HandleDeviceConnectionStateChanged(object? sender, DeviceConnectionStateChangedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            DeviceState = e.State;
+
+            if (e.ErrorMessage is not null)
+            {
+                ErrorMessage = e.ErrorMessage;
+            }
+        });
+    }
+
+    private void HandleDeviceButtonPressed(object? sender, DeviceButtonPressedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            LastButtonPressedPosition = e.Position;
+        });
+    }
 
     // ---------- Helpers compartidos ----------
 
@@ -619,5 +777,16 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasButtonAction));
         OnPropertyChanged(nameof(SelectedActionIsLaunchApplication));
         OnPropertyChanged(nameof(ConfiguredApplicationPathText));
+    }
+
+    partial void OnDeviceStateChanged(DeviceConnectionState value)
+    {
+        OnPropertyChanged(nameof(DeviceStatusText));
+        OnPropertyChanged(nameof(IsDeviceConnected));
+    }
+
+    partial void OnLastButtonPressedPositionChanged(int? value)
+    {
+        OnPropertyChanged(nameof(LastButtonPressedText));
     }
 }

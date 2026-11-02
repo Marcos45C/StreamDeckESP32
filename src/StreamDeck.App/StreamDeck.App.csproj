@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\StreamDeck.Application\StreamDeck.Application.csproj" />
+    <ProjectReference Include="..\StreamDeck.Domain\StreamDeck.Domain.csproj" />
     <ProjectReference Include="..\StreamDeck.Infrastructure\StreamDeck.Infrastructure.csproj" />
     <ProjectReference Include="..\StreamDeck.Device\StreamDeck.Device.csproj" />
   </ItemGroup>

@@ -86,8 +86,8 @@ Campos, separados por un espacio:
 La aplicación **solo** debe considerar el dispositivo conectado y listo después de recibir
 y validar esta respuesta — abrir el puerto serie con éxito no es, por sí solo, prueba de
 que hay un ESP32 con este firmware al otro lado.
-+Ver sección 5.2 para el detalle exacto de qué campos se validan y qué ocurre si alguno es
-+incorrecto o falta.
+Ver sección 5.2 para el detalle exacto de qué campos se validan y qué ocurre si alguno es
+incorrecto o falta.
 
 **Versión incompatible:**
 
@@ -114,35 +114,27 @@ Reglas:
 
 ### 4.3 Ejemplos
 
-Computadora abre el puerto y saluda
+```text
+# La computadora abre el puerto y saluda
+> HELLO 1
 
-HELLO 1
-Computadora abre el puerto y saluda
-
-HELLO 1
-
-ESP32 responde que está listo
-
+# El ESP32 responde que está listo
 < READY 1 ESP32-WROOM-32 9
 
-El usuario presiona el botón físico en la posición 5
-
+# El usuario presiona el botón físico en la posición 5
 < BUTTON 5
 
-El usuario presiona el botón físico en la posición 1
-
+# El usuario presiona el botón físico en la posición 1
 < BUTTON 1
 
-La computadora, por algún motivo, repite el handshake
-
-HELLO 1
+# La computadora repite el handshake
+> HELLO 1
 < READY 1 ESP32-WROOM-32 9
 
-Caso de versión incompatible
-
-HELLO 2
+# Caso de versión incompatible
+> HELLO 2
 < ERROR UNSUPPORTED_VERSION
-
+```
 
 ## 5. Secuencia de conexión
 
@@ -158,58 +150,59 @@ HELLO 2
 8. A partir de ese momento, el ESP32 comienza a comunicar pulsaciones de forma
    espontánea (no solicitadas), según ocurran.
 9. Cuando el usuario presiona un botón físico, el ESP32 envía `BUTTON N`.
- 10. La aplicación interpreta `N` como una posición (1-9), la resuelve contra el perfil y
-     la página actualmente activos, y ejecuta la acción configurada en ese `ButtonSlot`
-     (si existe alguna).
- 
- El dispositivo debe poder responder nuevamente a un `HELLO` en cualquier momento,
- incluso ya estando en estado "listo" — repetir el handshake no debe dejarlo en un estado
- inconsistente.
-+
-+### 5.1 Reintentos del handshake
-+
-+Abrir el puerto serie de un CP2102 puede provocar un **reinicio del ESP32** por el
-+comportamiento de las señales DTR/RTS del conversor USB-UART — esto depende del circuito
-+específico de la placa (auto-reset) y del driver del sistema operativo, y no es algo que
-+la aplicación pueda controlar ni desactivar de forma confiable. El handshake debe
-+diseñarse asumiendo que esto puede ocurrir en cualquier apertura de puerto.
-+
-+Secuencia que debe seguir la aplicación al abrir el puerto:
-+
-+1. Abrir el puerto serie.
-+2. Esperar aproximadamente **200 ms** antes de enviar el primer `HELLO 1` (margen para
-+   que, si el ESP32 se reinició al abrir el puerto, el firmware llegue a arrancar y
-+   quede escuchando).
-+3. Enviar `HELLO 1`.
-+4. Si no llega una respuesta `READY` válida (ver sección 5.2), reenviar `HELLO 1` cada
-+   **500 ms**.
-+5. Mantener una ventana máxima de **5 segundos**, contados desde el primer `HELLO`, para
-+   completar el handshake.
-+6. Si se agota ese tiempo sin recibir una respuesta `READY` válida, la aplicación debe
-+   informar que el dispositivo no respondió y permitir que el usuario intente de nuevo
-+   (repitiendo esta misma secuencia desde el paso 1 o el paso 3, según corresponda).
-+
-+El firmware, del lado del ESP32, debe responder `READY 1 ESP32-WROOM-32 9` cada vez que
-+reciba un `HELLO` compatible — **incluso si ya estaba en estado "listo"** y ya le había
-+respondido antes a un `HELLO` anterior. No debe ignorar un `HELLO` repetido asumiendo que
-+la aplicación ya lo sabe.
-+
-+Estos reintentos son exclusivos del handshake inicial. Los eventos `BUTTON N` no tienen
-+ningún mecanismo de reintento o confirmación (ver sección 8 y sección 10).
-+### 5.2 Validación de la respuesta READY
-+
-+La aplicación solo debe aceptar una respuesta `READY` y marcar el dispositivo como
-+conectado después de validar explícitamente **los cuatro campos**:
-+
-+1. La palabra `READY` (primer campo, literal).
-+2. La versión de protocolo: debe ser `1`.
-+3. El identificador de dispositivo: debe ser `ESP32-WROOM-32`.
-+4. La cantidad de botones: debe ser `9`.
-+
-+Un mensaje incompleto (con menos de cuatro campos), con campos en un orden distinto, o
-+con cualquiera de estos cuatro valores incorrecto, **no debe establecer la conexión** —
-+se trata igual que si no hubiera llegado ninguna respuesta válida, y el handshake sigue
-+reintentando según la secuencia de la sección 5.1 hasta agotar la ventana de 5 segundos.
+10. La aplicación interpreta `N` como una posición (1-9), la resuelve contra el perfil y
+    la página actualmente activos, y ejecuta la acción configurada en ese `ButtonSlot`
+    (si existe alguna).
+
+El dispositivo debe poder responder nuevamente a un `HELLO` en cualquier momento,
+incluso ya estando en estado "listo" — repetir el handshake no debe dejarlo en un estado
+inconsistente.
+
+### 5.1 Reintentos del handshake
+
+Abrir el puerto serie de un CP2102 puede provocar un **reinicio del ESP32** por el
+comportamiento de las señales DTR/RTS del conversor USB-UART — esto depende del circuito
+específico de la placa (auto-reset) y del driver del sistema operativo, y no es algo que
+la aplicación pueda controlar ni desactivar de forma confiable. El handshake debe
+diseñarse asumiendo que esto puede ocurrir en cualquier apertura de puerto.
+
+Secuencia que debe seguir la aplicación al abrir el puerto:
+
+1. Abrir el puerto serie.
+2. Esperar aproximadamente **200 ms** antes de enviar el primer `HELLO 1` (margen para
+   que, si el ESP32 se reinició al abrir el puerto, el firmware llegue a arrancar y
+   quede escuchando).
+3. Enviar `HELLO 1`.
+4. Si no llega una respuesta `READY` válida (ver sección 5.2), reenviar `HELLO 1` cada
+   **500 ms**.
+5. Mantener una ventana máxima de **5 segundos**, contados desde el primer `HELLO`, para
+   completar el handshake.
+6. Si se agota ese tiempo sin recibir una respuesta `READY` válida, la aplicación debe
+   informar que el dispositivo no respondió y permitir que el usuario intente de nuevo
+   (repitiendo esta misma secuencia desde el paso 1 o el paso 3, según corresponda).
+
+El firmware, del lado del ESP32, debe responder `READY 1 ESP32-WROOM-32 9` cada vez que
+reciba un `HELLO` compatible — **incluso si ya estaba en estado "listo"** y ya le había
+respondido antes a un `HELLO` anterior. No debe ignorar un `HELLO` repetido asumiendo que
+la aplicación ya lo sabe.
+
+Estos reintentos son exclusivos del handshake inicial. Los eventos `BUTTON N` no tienen
+ningún mecanismo de reintento o confirmación (ver sección 8 y sección 10).
+
+### 5.2 Validación de la respuesta READY
+
+La aplicación solo debe aceptar una respuesta `READY` y marcar el dispositivo como
+conectado después de validar explícitamente **los cuatro campos**:
+
+1. La palabra `READY` (primer campo, literal).
+2. La versión de protocolo: debe ser `1`.
+3. El identificador de dispositivo: debe ser `ESP32-WROOM-32`.
+4. La cantidad de botones: debe ser `9`.
+
+Un mensaje incompleto (con menos de cuatro campos), con campos en un orden distinto, o
+con cualquiera de estos cuatro valores incorrecto, **no debe establecer la conexión** —
+se trata igual que si no hubiera llegado ninguna respuesta válida, y el handshake sigue
+reintentando según la secuencia de la sección 5.1 hasta agotar la ventana de 5 segundos.
 
 ## 6. Mapa de GPIO (lógico/físico)
 
@@ -270,8 +263,8 @@ ESP32 leyendo de la aplicación), documentadas para ambas implementaciones futur
   conexión — el protocolo debe seguir funcionando con normalidad ante un mensaje que no
   reconoce.
  - **Mensajes que superan el tamaño máximo** (64 bytes) se descartan por completo: el
-+- **Mensajes que superan el tamaño máximo** (64 bytes de contenido, sin contar el
-+  terminador) se descartan por completo: el
+- **Mensajes que superan el tamaño máximo** (64 bytes de contenido, sin contar el
+  terminador) se descartan por completo: el
    receptor sigue consumiendo bytes sin procesarlos hasta encontrar el próximo `\n`, y
    recién ahí retoma el procesamiento normal.
 - **Una desconexión USB se trata como pérdida de conexión**, nunca como una pulsación o

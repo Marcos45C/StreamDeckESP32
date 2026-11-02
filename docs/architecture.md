@@ -8,7 +8,7 @@
 | `StreamDeck.Application` | Casos de uso, interfaces de servicios, coordinación de funcionalidades. | Domain |
 | `StreamDeck.Infrastructure` | Futuro almacenamiento JSON, acceso al sistema operativo, ejecución de acciones. | Application, Domain |
 | `StreamDeck.Device` | Futura administración del ESP32: estado de conexión, USB, Bluetooth. | Application, Domain |
-| `StreamDeck.App` | Interfaz Avalonia (MVVM): ventanas, vistas, ViewModels, recursos visuales. | Application, Infrastructure, Device |
+| `StreamDeck.App` | Interfaz Avalonia (MVVM): ventanas, vistas, ViewModels, recursos visuales. | Application, Domain, Infrastructure, Device |
 
 Sin dependencias circulares. `Domain` es la única capa sin dependencias internas.
 

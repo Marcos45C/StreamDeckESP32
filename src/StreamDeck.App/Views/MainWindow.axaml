@@ -2,10 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:StreamDeck.App.ViewModels"
         xmlns:entities="using:StreamDeck.Domain.Entities"
+        xmlns:converters="using:StreamDeck.App.Converters"
         xmlns:conv="using:Avalonia.Data.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:converters="using:StreamDeck.App.Converters"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="650"
         x:Class="StreamDeck.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -83,33 +83,33 @@
             <Setter Property="Background" Value="#202024" />
         </Style>
         <Style Selector="ListBox.ButtonGrid">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style Selector="ListBox.ButtonGrid ListBoxItem">
-        <Setter Property="Background" Value="{StaticResource PanelBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Margin" Value="4" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector="ListBox.ButtonGrid ListBoxItem:pointerover">
-        <Setter Property="Background" Value="#202024" />
-    </Style>
-    <Style Selector="ListBox.ButtonGrid ListBoxItem:selected">
-        <Setter Property="Background" Value="{StaticResource ActiveItemBackgroundBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-        <Setter Property="BorderThickness" Value="2" />
-    </Style>
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.ButtonGrid ListBoxItem">
+            <Setter Property="Background" Value="{StaticResource PanelBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Margin" Value="4" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ListBox.ButtonGrid ListBoxItem:pointerover">
+            <Setter Property="Background" Value="#202024" />
+        </Style>
+        <Style Selector="ListBox.ButtonGrid ListBoxItem:selected">
+            <Setter Property="Background" Value="{StaticResource ActiveItemBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
     </Window.Styles>
 
     <Grid Background="{StaticResource WindowBackgroundBrush}"
           ColumnDefinitions="210,*">
 
-        <!-- A. Barra lateral izquierda (sin cambios respecto a la Etapa 6.1) -->
+        <!-- A. Barra lateral izquierda -->
         <Border Grid.Column="0"
                 Background="{StaticResource SidebarBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -209,37 +209,65 @@
         </Border>
 
         <!-- Columna derecha: barra superior + (centro + panel derecho) -->
-        <Grid Grid.Column="1" RowDefinitions="56,*">
+        <Grid Grid.Column="1" RowDefinitions="Auto,*">
 
-            <!-- B. Barra superior (sin cambios) -->
+            <!-- B. Barra superior -->
             <Border Grid.Row="0"
                     Background="{StaticResource TopBarBackgroundBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,0,0,1">
-                <Grid ColumnDefinitions="*,Auto" Margin="24,0">
-                    <TextBlock Grid.Column="0"
-                               Text="{Binding CurrentSectionName}"
-                               Foreground="{StaticResource TextPrimaryBrush}"
-                               FontSize="14"
-                               FontWeight="Medium"
-                               VerticalAlignment="Center" />
+                <Grid RowDefinitions="Auto,Auto" Margin="24,8">
 
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="8"
-                                VerticalAlignment="Center">
-                        <Ellipse Width="8" Height="8"
-                                 Fill="{StaticResource StatusDisconnectedBrush}" />
-                        <TextBlock Text="{Binding DeviceStatusText}"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontSize="12.5" />
-                    </StackPanel>
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding CurrentSectionName}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   VerticalAlignment="Center" />
+
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    VerticalAlignment="Center">
+                            <ComboBox ItemsSource="{Binding AvailablePorts}"
+                                      SelectedItem="{Binding SelectedPort}"
+                                      PlaceholderText="Puerto…"
+                                      Width="150"
+                                      FontSize="12" />
+                            <Button Content="⟳"
+                                    Command="{Binding RefreshPortsCommand}"
+                                    Classes="SidebarAction"
+                                    ToolTip.Tip="Actualizar puertos" />
+                            <Button Content="Conectar"
+                                    Command="{Binding ConnectDeviceCommand}"
+                                    Classes="SidebarAction" />
+                            <Button Content="Desconectar"
+                                    Command="{Binding DisconnectDeviceCommand}"
+                                    Classes="SidebarAction"
+                                    Background="#2E2125"
+                                    Foreground="{StaticResource DangerTextBrush}" />
+                            <Ellipse Width="8" Height="8"
+                                     Fill="{Binding DeviceState, Converter={x:Static converters:DeviceConnectionStateColorConverter.Instance}}" />
+                            <TextBlock Text="{Binding DeviceStatusText}"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12.5" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding LastButtonPressedText}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="11"
+                               HorizontalAlignment="Right"
+                               Margin="0,4,0,0" />
+
                 </Grid>
             </Border>
 
             <Grid Grid.Row="1" ColumnDefinitions="*,260">
 
-                <!-- C. Área central: ahora con administración de páginas -->
+                <!-- C. Área central -->
                 <Border Grid.Column="0">
                     <Grid>
 
@@ -315,39 +343,45 @@
                             </StackPanel>
 
                             <Viewbox Grid.Row="2" Stretch="Uniform" StretchDirection="DownOnly">
-                        <ListBox Classes="ButtonGrid"
-                            Width="420" Height="420"
-                            SelectionMode="Single"
-                            ItemsSource="{Binding ButtonSlots}"
-                            SelectedItem="{Binding SelectedButtonSlot, Mode=TwoWay}">
-                            <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Rows="3" Columns="3" />
-                                </ItemsPanelTemplate>
-                            </ListBox.ItemsPanel>
-                            <ListBox.ItemTemplate>
-                                <!-- Ahora -->
-                                    <DataTemplate x:DataType="entities:ButtonSlot">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-                                            <TextBlock Text="{Binding Position}" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
-                                            <TextBlock Text="{Binding Action, Converter={x:Static converters:ButtonActionStatusConverter.Instance}}"
-                                                    FontSize="10.5"
-                                                    HorizontalAlignment="Center"
-                                                    MaxWidth="110"
-                                                    TextTrimming="CharacterEllipsis"
-                                                    Foreground="{StaticResource TextSecondaryBrush}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Viewbox>
+                                <ListBox Classes="ButtonGrid"
+                                         Width="420" Height="420"
+                                         SelectionMode="Single"
+                                         ItemsSource="{Binding ButtonSlots}"
+                                         SelectedItem="{Binding SelectedButtonSlot, Mode=TwoWay}">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="3" Columns="3" />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="entities:ButtonSlot">
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                                                <TextBlock Text="{Binding Position}"
+                                                           FontSize="20"
+                                                           FontWeight="SemiBold"
+                                                           HorizontalAlignment="Center"
+                                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                                <TextBlock Text="{Binding Action, Converter={x:Static converters:ButtonActionStatusConverter.Instance}}"
+                                                           FontSize="10.5"
+                                                           HorizontalAlignment="Center"
+                                                           MaxWidth="110"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Viewbox>
 
                         </Grid>
                     </Grid>
                 </Border>
 
-                <!-- D. Panel derecho (sin cambios) -->
-                <Border Grid.Column="1" Background="{StaticResource PanelBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0">
+                <!-- D. Panel derecho -->
+                <Border Grid.Column="1"
+                        Background="{StaticResource PanelBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1,0,0,0">
                     <Grid>
                         <StackPanel IsVisible="{Binding !HasSelectedButtonSlot}"
                                     VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20" Spacing="6">
@@ -355,18 +389,19 @@
                             <TextBlock Text="{Binding PropertiesEmptyStateMessage}" Classes="EmptyStateMessage" />
                         </StackPanel>
 
-                        <!-- Ahora -->
                         <StackPanel IsVisible="{Binding HasSelectedButtonSlot}" Margin="20,24" Spacing="10">
-                            <TextBlock Text="{Binding SelectedButtonSlotTitle}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="{Binding SelectedButtonSlotTitle}"
+                                       FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotPositionText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotRowText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotColumnText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
                             <TextBlock Text="{Binding SelectedButtonSlotStatusText}" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0" />
                             <TextBlock Text="{Binding ConfiguredApplicationPathText}"
-                                    FontSize="11.5"
-                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                    TextWrapping="Wrap"
-                                    IsVisible="{Binding HasButtonAction}" />
+                                       FontSize="11.5"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       IsVisible="{Binding HasButtonAction}" />
 
                             <Button Content="Asignar aplicación"
                                     Command="{Binding AssignApplicationCommand}"
@@ -375,7 +410,6 @@
                                     Margin="0,8,0,0"
                                     HorizontalAlignment="Stretch" />
 
-                            <!-- Ahora -->
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding HasButtonAction}">
                                 <Button Content="Probar acción"
                                         Command="{Binding ExecuteSelectedButtonActionCommand}"

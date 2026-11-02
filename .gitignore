@@ -53,9 +53,5 @@ Desktop.ini
 *.log
 *.tmp
 
-# Varios
-*.log
-*.tmp
-+
 # PlatformIO (firmware/esp32)
 .pio/

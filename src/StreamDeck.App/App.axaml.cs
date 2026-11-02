@@ -3,11 +3,12 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using StreamDeck.App.ViewModels;
 using StreamDeck.App.Views;
+using StreamDeck.Application.Device;
 using StreamDeck.Application.Execution;
 using StreamDeck.Application.Profiles;
+using StreamDeck.Device.Serial;
 using StreamDeck.Infrastructure.Execution;
 using StreamDeck.Infrastructure.Persistence.Json;
-
 
 namespace StreamDeck.App;
 
@@ -26,11 +27,11 @@ public partial class App : Avalonia.Application
             var profileService = new ProfileService(profileRepository);
             var applicationLauncher = new SystemApplicationLauncher();
             var buttonActionExecutionService = new ButtonActionExecutionService(profileRepository, applicationLauncher);
-
+            var deviceConnection = new SerialDeviceConnection();
 
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainViewModel(profileService, buttonActionExecutionService),
+                DataContext = new MainViewModel(profileService, buttonActionExecutionService, deviceConnection),
             };
         }
 
