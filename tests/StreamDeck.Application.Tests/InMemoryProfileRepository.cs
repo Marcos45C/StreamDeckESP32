@@ -1,4 +1,4 @@
-using StreamDeck.Application.Profiles;
+﻿using StreamDeck.Application.Profiles;
 using StreamDeck.Domain.Entities;
 
 namespace StreamDeck.Application.Tests;
@@ -68,10 +68,17 @@ internal sealed class InMemoryProfileRepository : IProfileRepository
 
             foreach (var originalSlot in originalPage.Slots)
             {
-                if (originalSlot.Action is LaunchApplicationAction launch)
+                var clonedSlot = clonedPage.Slots.First(s => s.Position == originalSlot.Position);
+
+                switch (originalSlot.Action)
                 {
-                    var clonedSlot = clonedPage.Slots.First(s => s.Position == originalSlot.Position);
-                    clonedSlot.AssignAction(new LaunchApplicationAction(launch.ApplicationPath));
+                    case LaunchApplicationAction launch:
+                        clonedSlot.AssignAction(new LaunchApplicationAction(launch.ApplicationPath));
+                        break;
+
+                    case OpenUrlAction openUrl:
+                        clonedSlot.AssignAction(new OpenUrlAction(openUrl.Url));
+                        break;
                 }
             }
         }

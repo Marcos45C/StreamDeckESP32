@@ -6,49 +6,69 @@ namespace StreamDeck.Application.Execution;
 public sealed class ButtonActionExecutionService
 {
     private readonly IProfileRepository _repository;
-    private readonly IApplicationLauncher _launcher;
+    private readonly IApplicationLauncher _applicationLauncher;
+    private readonly IUrlLauncher _urlLauncher;
 
-    public ButtonActionExecutionService(IProfileRepository repository, IApplicationLauncher launcher)
+    public ButtonActionExecutionService(
+        IProfileRepository repository,
+        IApplicationLauncher applicationLauncher,
+        IUrlLauncher urlLauncher)
     {
         ArgumentNullException.ThrowIfNull(repository);
-        ArgumentNullException.ThrowIfNull(launcher);
+        ArgumentNullException.ThrowIfNull(applicationLauncher);
+        ArgumentNullException.ThrowIfNull(urlLauncher);
+
         _repository = repository;
-        _launcher = launcher;
+        _applicationLauncher = applicationLauncher;
+        _urlLauncher = urlLauncher;
     }
 
-    public async Task ExecuteAsync(Guid profileId, Guid pageId, int position, CancellationToken cancellationToken = default)
-{
-    var profile = await _repository.GetByIdAsync(profileId, cancellationToken).ConfigureAwait(false);
-
-    if (profile is null)
+    public async Task ExecuteAsync(
+        Guid profileId,
+        Guid pageId,
+        int position,
+        CancellationToken cancellationToken = default)
     {
-        throw new KeyNotFoundException($"No existe ningún perfil con el id '{profileId}'.");
-    }
+        var profile = await _repository.GetByIdAsync(profileId, cancellationToken).ConfigureAwait(false);
 
-    var page = profile.Pages.FirstOrDefault(p => p.Id == pageId)
-        ?? throw new KeyNotFoundException($"No existe ninguna página con el id '{pageId}' en el perfil '{profileId}'.");
+        if (profile is null)
+        {
+            throw new KeyNotFoundException($"No existe ningún perfil con el id '{profileId}'.");
+        }
 
-    var slot = page.Slots.FirstOrDefault(s => s.Position == position)
-        ?? throw new KeyNotFoundException($"No existe ningún botón en la posición {position} de la página '{pageId}'.");
+        var page = profile.Pages.FirstOrDefault(p => p.Id == pageId)
+            ?? throw new KeyNotFoundException(
+                $"No existe ninguna página con el id '{pageId}' en el perfil '{profileId}'.");
 
-    if (slot.Action is null)
-    {
-        throw new ButtonActionNotConfiguredException($"El botón en la posición {position} no tiene ninguna acción asignada.");
-    }
+        var slot = page.Slots.FirstOrDefault(s => s.Position == position)
+            ?? throw new KeyNotFoundException(
+                $"No existe ningún botón en la posición {position} de la página '{pageId}'.");
 
-    cancellationToken.ThrowIfCancellationRequested();
+        if (slot.Action is null)
+        {
+            throw new ButtonActionNotConfiguredException(
+                $"El botón en la posición {position} no tiene ninguna acción asignada.");
+        }
 
-    switch (slot.Action)
-    {
-        case LaunchApplicationAction launch:
-            _launcher.Launch(launch.ApplicationPath);
-            break;
-        default:
-            throw new NotSupportedException(
-                $"El tipo de acción '{slot.Action.GetType().Name}' todavía no admite ejecución.");
+        cancellationToken.ThrowIfCancellationRequested();
+
+        switch (slot.Action)
+        {
+            case LaunchApplicationAction launch:
+                _applicationLauncher.Launch(launch.ApplicationPath);
+                break;
+
+            case OpenUrlAction openUrl:
+                _urlLauncher.Open(openUrl.Url);
+                break;
+
+            default:
+                throw new NotSupportedException(
+                    $"El tipo de acción '{slot.Action.GetType().Name}' todavía no admite ejecución.");
+        }
     }
 }
-}
+
 public sealed class ButtonActionNotConfiguredException : InvalidOperationException
 {
     public ButtonActionNotConfiguredException(string message) : base(message)

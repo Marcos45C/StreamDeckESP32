@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using StreamDeck.App.ViewModels;
@@ -26,7 +26,9 @@ public partial class App : Avalonia.Application
             var profileRepository = new JsonProfileRepository();
             var profileService = new ProfileService(profileRepository);
             var applicationLauncher = new SystemApplicationLauncher();
-            var buttonActionExecutionService = new ButtonActionExecutionService(profileRepository, applicationLauncher);
+            var urlLauncher = new SystemUrlLauncher();
+            var buttonActionExecutionService = new ButtonActionExecutionService(
+                profileRepository, applicationLauncher, urlLauncher);
             var deviceConnection = new SerialDeviceConnection();
 
             desktop.MainWindow = new MainWindow
