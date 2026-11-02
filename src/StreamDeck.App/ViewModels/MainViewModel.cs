@@ -7,6 +7,7 @@ using StreamDeck.Application.Device;
 using StreamDeck.Application.Execution;
 using StreamDeck.Application.Profiles;
 using StreamDeck.Domain.Entities;
+using System.Threading;
 
 namespace StreamDeck.App.ViewModels;
 
@@ -20,12 +21,24 @@ public partial class MainViewModel : ViewModelBase
     private readonly SemaphoreSlim _buttonPressSignal = new(0);
     private readonly CancellationTokenSource _buttonProcessingCancellation = new();
 
-    private readonly record struct ButtonPressEvent(Guid? ProfileId, Guid? PageId, int Position);
+    private Task? _buttonProcessingTask;
+    private bool _isShuttingDown;
+
+    private ActiveSelectionSnapshot _activeSelectionSnapshot = new(null, null);
+
+    private readonly record struct ButtonPressEvent(
+        Guid? ProfileId,
+        Guid? PageId,
+        int Position);
+
+    private sealed record ActiveSelectionSnapshot(
+        Guid? ProfileId,
+        Guid? PageId);
 
     public MainViewModel(
-        ProfileService profileService,
-        ButtonActionExecutionService buttonActionExecutionService,
-        IDeviceConnection deviceConnection)
+    ProfileService profileService,
+    ButtonActionExecutionService buttonActionExecutionService,
+    IDeviceConnection deviceConnection)
     {
         ArgumentNullException.ThrowIfNull(profileService);
         ArgumentNullException.ThrowIfNull(buttonActionExecutionService);
@@ -38,7 +51,8 @@ public partial class MainViewModel : ViewModelBase
         _deviceConnection.StateChanged += HandleDeviceConnectionStateChanged;
         _deviceConnection.ButtonPressed += HandleDeviceButtonPressed;
 
-        _ = ProcessButtonPressQueueAsync(_buttonProcessingCancellation.Token);
+        _buttonProcessingTask =
+            ProcessButtonPressQueueAsync(_buttonProcessingCancellation.Token);
 
         RefreshPortsCommand.Execute(null);
         LoadProfilesCommand.Execute(null);
@@ -644,7 +658,7 @@ public partial class MainViewModel : ViewModelBase
 
     public async Task DisconnectDeviceForShutdownAsync()
     {
-        _buttonProcessingCancellation.Cancel();
+        Volatile.Write(ref _isShuttingDown, true);
 
         try
         {
@@ -652,8 +666,25 @@ public partial class MainViewModel : ViewModelBase
         }
         catch
         {
-            // Mejor esfuerzo durante el cierre: no bloquear el apagado de la app por esto.
+            // Mejor esfuerzo durante el cierre.
         }
+
+        _buttonProcessingCancellation.Cancel();
+
+        if (_buttonProcessingTask is not null)
+        {
+            try
+            {
+                await _buttonProcessingTask;
+            }
+            catch
+            {
+                // El consumidor maneja sus propias excepciones.
+            }
+        }
+
+        _buttonPressSignal.Dispose();
+        _buttonProcessingCancellation.Dispose();
     }
 
     private void HandleDeviceConnectionStateChanged(object? sender, DeviceConnectionStateChangedEventArgs e)
@@ -669,18 +700,35 @@ public partial class MainViewModel : ViewModelBase
         });
     }
 
-    private void HandleDeviceButtonPressed(object? sender, DeviceButtonPressedEventArgs e)
+        private void HandleDeviceButtonPressed(
+        object? sender,
+        DeviceButtonPressedEventArgs e)
     {
-        // Se capturan el perfil y la página en el instante de la pulsación física
-        // (no al procesarla desde la cola), para que un cambio posterior de selección
-        // no altere a qué página pertenece esta pulsación. SelectedButtonSlot nunca
-        // interviene acá: la selección visual es solo para configurar propiedades.
-        var pressEvent = new ButtonPressEvent(SelectedProfile?.Id, SelectedPage?.Id, e.Position);
+        if (Volatile.Read(ref _isShuttingDown))
+        {
+            return;
+        }
+
+        var snapshot = Volatile.Read(ref _activeSelectionSnapshot);
+
+        var pressEvent = new ButtonPressEvent(
+            snapshot.ProfileId,
+            snapshot.PageId,
+            e.Position);
 
         _buttonPressQueue.Enqueue(pressEvent);
         _buttonPressSignal.Release();
 
-        Dispatcher.UIThread.Post(() => LastButtonPressedPosition = e.Position);
+        Dispatcher.UIThread.Post(() =>
+            LastButtonPressedPosition = e.Position);
+    }
+        private void UpdateActiveSelectionSnapshot()
+    {
+        var snapshot = new ActiveSelectionSnapshot(
+            SelectedProfile?.Id,
+            SelectedPage?.Id);
+
+        Volatile.Write(ref _activeSelectionSnapshot, snapshot);
     }
 
     private async Task ProcessButtonPressQueueAsync(CancellationToken cancellationToken)
@@ -703,43 +751,57 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    private async Task ProcessSingleButtonPressAsync(ButtonPressEvent pressEvent, CancellationToken cancellationToken)
+    private async Task ProcessSingleButtonPressAsync(
+    ButtonPressEvent pressEvent,
+    CancellationToken cancellationToken)
     {
-        if (pressEvent.ProfileId is not Guid profileId || pressEvent.PageId is not Guid pageId)
+        if (pressEvent.ProfileId is not Guid profileId ||
+            pressEvent.PageId is not Guid pageId)
         {
             Dispatcher.UIThread.Post(() =>
-                LastButtonActivityText = $"Botón {pressEvent.Position}: no hay perfil o página activos.");
+                LastButtonActivityText =
+                    $"Botón {pressEvent.Position}: no hay perfil o página activos.");
+
             return;
         }
 
         try
         {
-            await _buttonActionExecutionService.ExecuteAsync(profileId, pageId, pressEvent.Position, cancellationToken)
-                .ConfigureAwait(false);
+            await _buttonActionExecutionService.ExecuteAsync(
+                profileId,
+                pageId,
+                pressEvent.Position,
+                cancellationToken).ConfigureAwait(false);
 
             Dispatcher.UIThread.Post(() =>
-                LastButtonActivityText = $"Botón {pressEvent.Position}: acción ejecutada.");
+                LastButtonActivityText =
+                    $"Botón {pressEvent.Position}: acción ejecutada.");
         }
-        catch (InvalidOperationException)
+        catch (ButtonActionNotConfiguredException)
         {
             Dispatcher.UIThread.Post(() =>
-                LastButtonActivityText = $"Botón {pressEvent.Position}: sin acción asignada.");
+                LastButtonActivityText =
+                    $"Botón {pressEvent.Position}: sin acción asignada.");
         }
         catch (KeyNotFoundException)
         {
             Dispatcher.UIThread.Post(() =>
-                LastButtonActivityText = $"Botón {pressEvent.Position}: no hay perfil o página activos.");
+                LastButtonActivityText =
+                    $"Botón {pressEvent.Position}: no hay perfil o página activos.");
         }
         catch (OperationCanceledException)
         {
-            // Cierre de la aplicación en curso: no se muestra como error.
+            // Cierre de la aplicación en curso.
         }
         catch (Exception ex)
         {
             Dispatcher.UIThread.Post(() =>
             {
-                LastButtonActivityText = $"Botón {pressEvent.Position}: error al ejecutar la acción.";
-                ErrorMessage = $"No se pudo ejecutar la acción del botón {pressEvent.Position}: {ex.Message}";
+                LastButtonActivityText =
+                    $"Botón {pressEvent.Position}: error al ejecutar la acción.";
+
+                ErrorMessage =
+                    $"No se pudo ejecutar la acción del botón {pressEvent.Position}: {ex.Message}";
             });
         }
     }
@@ -822,7 +884,10 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CenterEmptyStateTitle));
         OnPropertyChanged(nameof(CenterEmptyStateMessage));
         OnPropertyChanged(nameof(HasSelectedProfile));
+
         SyncPagesFromSelectedProfile();
+
+        UpdateActiveSelectionSnapshot();
     }
 
     partial void OnHasProfilesChanged(bool value)
@@ -831,12 +896,14 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CenterEmptyStateMessage));
     }
 
-    partial void OnSelectedPageChanged(Page? value)
+        partial void OnSelectedPageChanged(Page? value)
     {
         OnPropertyChanged(nameof(ButtonSlots));
-        SelectedButtonSlot = value?.Slots.FirstOrDefault();
-    }
 
+        SelectedButtonSlot = value?.Slots.FirstOrDefault();
+
+        UpdateActiveSelectionSnapshot();
+    }
     partial void OnSelectedButtonSlotChanged(ButtonSlot? value)
     {
         OnPropertyChanged(nameof(HasSelectedButtonSlot));

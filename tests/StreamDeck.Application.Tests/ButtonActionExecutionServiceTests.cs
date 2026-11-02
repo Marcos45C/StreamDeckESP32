@@ -22,15 +22,17 @@ public class ButtonActionExecutionServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithUnconfiguredButton_ThrowsInvalidOperationExceptionAndDoesNotLaunch()
+    public async Task ExecuteAsync_WithUnconfiguredButton_ThrowsButtonActionNotConfiguredExceptionAndDoesNotLaunch()
     {
         var repository = new InMemoryProfileRepository();
         var profile = Profile.Create("Mi perfil");
+
         await repository.SaveAsync(profile);
+
         var launcher = new FakeApplicationLauncher();
         var service = new ButtonActionExecutionService(repository, launcher);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<ButtonActionNotConfiguredException>(
             () => service.ExecuteAsync(profile.Id, profile.Pages[0].Id, 1));
 
         Assert.Equal(0, launcher.LaunchCallCount);

@@ -94,3 +94,14 @@ Deck virtual ni una réplica por software del hardware.
 - Comunicación USB o Bluetooth con el ESP32.
 - Sistema de actualización, instaladores.
 - Python, bases de datos o servicios en la nube: descartados explícitamente.
+
+
+## Buscar otras aplicaciones
+Podés utilizar estos comandos para encontrar ejecutables:
+Aplicación	        | Comando
+Visual Studio Code	  which code
+Firefox	              which firefox
+Google Chrome	        which google-chrome
+Steam	                which steam
+VLC	                  which vlc
+Discord	              which discord
