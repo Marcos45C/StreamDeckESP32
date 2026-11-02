@@ -87,4 +87,15 @@ public class ButtonSlotActionTests
         Assert.NotNull(slot1.Action);
         Assert.Null(slot2.Action);
     }
+    [Fact]
+    public void AssignAction_WithOpenUrlAction_SetsAction()
+    {
+        var profile = Profile.Create("Mi perfil");
+        var slot = profile.Pages[0].Slots[0];
+        var action = new OpenUrlAction("https://example.com");
+
+        slot.AssignAction(action);
+
+        Assert.Same(action, slot.Action);
+    }
 }

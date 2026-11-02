@@ -89,7 +89,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
 
-        Assert.Equal(3, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(4, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(profile.Id, root.GetProperty("id").GetGuid());
         Assert.Equal("Mi perfil", root.GetProperty("name").GetString());
 
@@ -299,7 +299,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion3()
+    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion4()
     {
         var id = Guid.NewGuid();
         var pageId = Guid.NewGuid();
@@ -317,7 +317,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
 
         var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{id}.json"));
 
-        Assert.Contains("\"schemaVersion\": 3", json);
+        Assert.Contains("\"schemaVersion\": 4", json);
         Assert.Contains("\"slotPositions\"", json);
         Assert.Contains("\"actions\"", json);
     }
@@ -759,6 +759,114 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         Assert.Equal(9, loaded!.Pages[0].Slots.Count);
         Assert.All(loaded.Pages[0].Slots, s => Assert.Null(s.Action));
     }
+    [Fact]
+public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion4WithUrlAndNoApplicationPath()
+{
+    var profile = Profile.Create("Mi perfil");
+    profile.Pages[0].Slots[0].AssignAction(new OpenUrlAction("https://example.com"));
+
+    await _repository.SaveAsync(profile);
+    var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{profile.Id}.json"));
+
+    using var document = JsonDocument.Parse(json);
+    var actionElement = document.RootElement.GetProperty("pages")[0].GetProperty("actions")[0];
+
+    Assert.Equal("openUrl", actionElement.GetProperty("type").GetString());
+    Assert.Equal("https://example.com", actionElement.GetProperty("url").GetString());
+    Assert.False(actionElement.TryGetProperty("applicationPath", out _));
+}
+
+[Fact]
+public async Task SaveAsync_ThenGetByIdAsync_PreservesOpenUrlAction()
+{
+    var profile = Profile.Create("Mi perfil");
+    profile.Pages[0].Slots[0].AssignAction(new OpenUrlAction("https://example.com/ruta"));
+
+    await _repository.SaveAsync(profile);
+    var loaded = await _repository.GetByIdAsync(profile.Id);
+
+    var action = Assert.IsType<OpenUrlAction>(loaded!.Pages[0].Slots[0].Action);
+    Assert.Equal("https://example.com/ruta", action.Url);
+}
+
+[Fact]
+public async Task SaveAsync_ThenGetByIdAsync_PreservesLaunchApplicationAction()
+{
+    var profile = Profile.Create("Mi perfil");
+    profile.Pages[0].Slots[0].AssignAction(new LaunchApplicationAction("/usr/bin/firefox"));
+
+    await _repository.SaveAsync(profile);
+    var loaded = await _repository.GetByIdAsync(profile.Id);
+
+    var action = Assert.IsType<LaunchApplicationAction>(loaded!.Pages[0].Slots[0].Action);
+    Assert.Equal("/usr/bin/firefox", action.ApplicationPath);
+}
+
+[Fact]
+public async Task SaveAsync_ThenGetByIdAsync_PreservesBothActionTypesInSameProfile()
+{
+    var profile = Profile.Create("Mi perfil");
+    profile.Pages[0].Slots[0].AssignAction(new LaunchApplicationAction("/usr/bin/firefox"));
+    profile.Pages[0].Slots[1].AssignAction(new OpenUrlAction("https://example.com"));
+
+    await _repository.SaveAsync(profile);
+    var loaded = await _repository.GetByIdAsync(profile.Id);
+
+    var slots = loaded!.Pages[0].Slots;
+    Assert.IsType<LaunchApplicationAction>(slots.First(s => s.Position == 1).Action);
+    Assert.IsType<OpenUrlAction>(slots.First(s => s.Position == 2).Action);
+}
+
+[Fact]
+public async Task GetByIdAsync_WithSchemaVersion3AndOpenUrlAction_ThrowsInvalidDataException()
+{
+    var id = Guid.NewGuid();
+    await WriteRawJsonAsync(id, $$"""
+    {
+      "schemaVersion": 3,
+      "id": "{{id}}",
+      "name": "Perfil",
+      "pages": [
+        {
+          "id": "{{Guid.NewGuid()}}",
+          "name": "Página 1",
+          "slotPositions": [1,2,3,4,5,6,7,8,9],
+          "actions": [ { "position": 1, "type": "openUrl", "url": "https://example.com" } ]
+        }
+      ]
+    }
+    """);
+
+    await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+}
+
+[Theory]
+[InlineData("""[ { "position": 1, "type": "openUrl", "url": "not a valid url" } ]""")]
+[InlineData("""[ { "position": 1, "type": "openUrl", "url": "ftp://example.com" } ]""")]
+[InlineData("""[ { "position": 1, "type": "openUrl" } ]""")]
+[InlineData("""[ { "position": 1, "type": "unknownType", "url": "https://example.com" } ]""")]
+[InlineData("""[ { "position": 1, "type": "openUrl", "url": "https://example.com" }, { "position": 1, "type": "launchApplication", "applicationPath": "/usr/bin/x" } ]""")]
+public async Task GetByIdAsync_WithSchemaVersion4AndInvalidActionsArray_ThrowsInvalidDataException(string actionsJson)
+{
+    var id = Guid.NewGuid();
+    await WriteRawJsonAsync(id, $$"""
+    {
+      "schemaVersion": 4,
+      "id": "{{id}}",
+      "name": "Perfil",
+      "pages": [
+        {
+          "id": "{{Guid.NewGuid()}}",
+          "name": "Página 1",
+          "slotPositions": [1,2,3,4,5,6,7,8,9],
+          "actions": {{actionsJson}}
+        }
+      ]
+    }
+    """);
+
+    await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+}
 
     [Fact]
     public async Task GetByIdAsync_WithSchemaVersion3AndMissingActionsProperty_ThrowsInvalidDataException()
@@ -819,4 +927,66 @@ public sealed class JsonProfileRepositoryTests : IDisposable
 
         await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
     }
+    [Fact]
+public async Task GetByIdAsync_WithSchemaVersion4LaunchApplicationContainingUrl_ThrowsInvalidDataException()
+{
+    var id = Guid.NewGuid();
+
+    await WriteRawJsonAsync(id, $$"""
+    {
+      "schemaVersion": 4,
+      "id": "{{id}}",
+      "name": "Perfil",
+      "pages": [
+        {
+          "id": "{{Guid.NewGuid()}}",
+          "name": "Página 1",
+          "slotPositions": [1,2,3,4,5,6,7,8,9],
+          "actions": [
+            {
+              "position": 1,
+              "type": "launchApplication",
+              "applicationPath": "/usr/bin/firefox",
+              "url": "https://example.com"
+            }
+          ]
+        }
+      ]
+    }
+    """);
+
+    await Assert.ThrowsAsync<InvalidDataException>(
+        () => _repository.GetByIdAsync(id));
+}
+[Fact]
+public async Task GetByIdAsync_WithSchemaVersion4OpenUrlContainingApplicationPath_ThrowsInvalidDataException()
+{
+    var id = Guid.NewGuid();
+
+    await WriteRawJsonAsync(id, $$"""
+    {
+      "schemaVersion": 4,
+      "id": "{{id}}",
+      "name": "Perfil",
+      "pages": [
+        {
+          "id": "{{Guid.NewGuid()}}",
+          "name": "Página 1",
+          "slotPositions": [1,2,3,4,5,6,7,8,9],
+          "actions": [
+            {
+              "position": 1,
+              "type": "openUrl",
+              "url": "https://example.com",
+              "applicationPath": "/usr/bin/firefox"
+            }
+          ]
+        }
+      ]
+    }
+    """);
+
+    await Assert.ThrowsAsync<InvalidDataException>(
+        () => _repository.GetByIdAsync(id));
+}
 }
