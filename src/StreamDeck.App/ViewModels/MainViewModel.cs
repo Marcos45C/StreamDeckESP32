@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -15,6 +16,12 @@ public partial class MainViewModel : ViewModelBase
     private readonly ButtonActionExecutionService _buttonActionExecutionService;
     private readonly IDeviceConnection _deviceConnection;
 
+    private readonly ConcurrentQueue<ButtonPressEvent> _buttonPressQueue = new();
+    private readonly SemaphoreSlim _buttonPressSignal = new(0);
+    private readonly CancellationTokenSource _buttonProcessingCancellation = new();
+
+    private readonly record struct ButtonPressEvent(Guid? ProfileId, Guid? PageId, int Position);
+
     public MainViewModel(
         ProfileService profileService,
         ButtonActionExecutionService buttonActionExecutionService,
@@ -30,6 +37,8 @@ public partial class MainViewModel : ViewModelBase
 
         _deviceConnection.StateChanged += HandleDeviceConnectionStateChanged;
         _deviceConnection.ButtonPressed += HandleDeviceButtonPressed;
+
+        _ = ProcessButtonPressQueueAsync(_buttonProcessingCancellation.Token);
 
         RefreshPortsCommand.Execute(null);
         LoadProfilesCommand.Execute(null);
@@ -102,11 +111,6 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
     [NotifyCanExecuteChangedFor(nameof(DisconnectDeviceCommand))]
-    public partial bool IsDisconnecting { get; set; }
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
-    [NotifyCanExecuteChangedFor(nameof(DisconnectDeviceCommand))]
     public partial DeviceConnectionState DeviceState { get; set; } = DeviceConnectionState.Disconnected;
 
     [ObservableProperty]
@@ -115,6 +119,9 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial int? LastButtonPressedPosition { get; set; }
+
+    [ObservableProperty]
+    public partial string? LastButtonActivityText { get; set; }
 
     public ObservableCollection<Profile> Profiles { get; } = new();
 
@@ -484,7 +491,7 @@ public partial class MainViewModel : ViewModelBase
     private bool CanMoveSelectedPageRight() =>
         !IsBusy && SelectedPage is not null && Pages.IndexOf(SelectedPage) < Pages.Count - 1;
 
-    // ---------- Acciones de botones ----------
+    // ---------- Acciones de botones (configuración / prueba manual) ----------
 
     [RelayCommand(CanExecute = nameof(CanAssignOrChangeApplication))]
     private async Task AssignApplicationAsync()
@@ -585,7 +592,7 @@ public partial class MainViewModel : ViewModelBase
     }
 
     private bool CanConnectDevice() =>
-        !IsDeviceBusy && !IsDisconnecting && !string.IsNullOrWhiteSpace(SelectedPort) &&
+        !IsDeviceBusy && !string.IsNullOrWhiteSpace(SelectedPort) &&
         (DeviceState == DeviceConnectionState.Disconnected || DeviceState == DeviceConnectionState.Error);
 
     [RelayCommand(CanExecute = nameof(CanConnectDevice))]
@@ -603,10 +610,6 @@ public partial class MainViewModel : ViewModelBase
         {
             await _deviceConnection.ConnectAsync(SelectedPort, CancellationToken.None);
         }
-        catch (OperationCanceledException)
-        {
-            // La conexión fue cancelada intencionalmente, por ejemplo al desconectar.
-        }
         catch (Exception ex)
         {
             ErrorMessage = $"No se pudo conectar con el dispositivo: {ex.Message}";
@@ -618,13 +621,12 @@ public partial class MainViewModel : ViewModelBase
     }
 
     private bool CanDisconnectDevice() =>
-        !IsDisconnecting &&
-        (DeviceState == DeviceConnectionState.Connected || DeviceState == DeviceConnectionState.Connecting);
+        !IsDeviceBusy && (DeviceState == DeviceConnectionState.Connected || DeviceState == DeviceConnectionState.Connecting);
 
     [RelayCommand(CanExecute = nameof(CanDisconnectDevice))]
     private async Task DisconnectDeviceAsync()
     {
-        IsDisconnecting = true;
+        IsDeviceBusy = true;
 
         try
         {
@@ -636,12 +638,14 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
-            IsDisconnecting = false;
+            IsDeviceBusy = false;
         }
     }
 
     public async Task DisconnectDeviceForShutdownAsync()
     {
+        _buttonProcessingCancellation.Cancel();
+
         try
         {
             await _deviceConnection.DisconnectAsync();
@@ -667,10 +671,77 @@ public partial class MainViewModel : ViewModelBase
 
     private void HandleDeviceButtonPressed(object? sender, DeviceButtonPressedEventArgs e)
     {
-        Dispatcher.UIThread.Post(() =>
+        // Se capturan el perfil y la página en el instante de la pulsación física
+        // (no al procesarla desde la cola), para que un cambio posterior de selección
+        // no altere a qué página pertenece esta pulsación. SelectedButtonSlot nunca
+        // interviene acá: la selección visual es solo para configurar propiedades.
+        var pressEvent = new ButtonPressEvent(SelectedProfile?.Id, SelectedPage?.Id, e.Position);
+
+        _buttonPressQueue.Enqueue(pressEvent);
+        _buttonPressSignal.Release();
+
+        Dispatcher.UIThread.Post(() => LastButtonPressedPosition = e.Position);
+    }
+
+    private async Task ProcessButtonPressQueueAsync(CancellationToken cancellationToken)
+    {
+        try
         {
-            LastButtonPressedPosition = e.Position;
-        });
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await _buttonPressSignal.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+                if (_buttonPressQueue.TryDequeue(out var pressEvent))
+                {
+                    await ProcessSingleButtonPressAsync(pressEvent, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cierre de la aplicación: se deja de procesar la cola.
+        }
+    }
+
+    private async Task ProcessSingleButtonPressAsync(ButtonPressEvent pressEvent, CancellationToken cancellationToken)
+    {
+        if (pressEvent.ProfileId is not Guid profileId || pressEvent.PageId is not Guid pageId)
+        {
+            Dispatcher.UIThread.Post(() =>
+                LastButtonActivityText = $"Botón {pressEvent.Position}: no hay perfil o página activos.");
+            return;
+        }
+
+        try
+        {
+            await _buttonActionExecutionService.ExecuteAsync(profileId, pageId, pressEvent.Position, cancellationToken)
+                .ConfigureAwait(false);
+
+            Dispatcher.UIThread.Post(() =>
+                LastButtonActivityText = $"Botón {pressEvent.Position}: acción ejecutada.");
+        }
+        catch (InvalidOperationException)
+        {
+            Dispatcher.UIThread.Post(() =>
+                LastButtonActivityText = $"Botón {pressEvent.Position}: sin acción asignada.");
+        }
+        catch (KeyNotFoundException)
+        {
+            Dispatcher.UIThread.Post(() =>
+                LastButtonActivityText = $"Botón {pressEvent.Position}: no hay perfil o página activos.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Cierre de la aplicación en curso: no se muestra como error.
+        }
+        catch (Exception ex)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                LastButtonActivityText = $"Botón {pressEvent.Position}: error al ejecutar la acción.";
+                ErrorMessage = $"No se pudo ejecutar la acción del botón {pressEvent.Position}: {ex.Message}";
+            });
+        }
     }
 
     // ---------- Helpers compartidos ----------

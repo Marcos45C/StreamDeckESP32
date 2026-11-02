@@ -49,3 +49,9 @@ public sealed class ButtonActionExecutionService
         }
     }
 }
+public sealed class ButtonActionNotConfiguredException : InvalidOperationException
+{
+    public ButtonActionNotConfiguredException(string message) : base(message)
+    {
+    }
+}

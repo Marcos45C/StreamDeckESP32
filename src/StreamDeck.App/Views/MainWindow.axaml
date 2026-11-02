@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:StreamDeck.App.ViewModels"
         xmlns:entities="using:StreamDeck.Domain.Entities"
-        xmlns:converters="using:StreamDeck.App.Converters"
         xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:converters="using:StreamDeck.App.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="650"
@@ -255,12 +255,19 @@
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock Grid.Row="1"
-                               Text="{Binding LastButtonPressedText}"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontSize="11"
-                               HorizontalAlignment="Right"
-                               Margin="0,4,0,0" />
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                Spacing="12"
+                                HorizontalAlignment="Right"
+                                Margin="0,4,0,0">
+                        <TextBlock Text="{Binding LastButtonPressedText}"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="11" />
+                        <TextBlock Text="{Binding LastButtonActivityText}"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   FontSize="11"
+                                   IsVisible="{Binding LastButtonActivityText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
 
                 </Grid>
             </Border>
