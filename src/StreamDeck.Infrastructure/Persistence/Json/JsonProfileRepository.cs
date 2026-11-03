@@ -13,6 +13,7 @@ public sealed class JsonProfileRepository : IProfileRepository
     private const int SchemaVersionWithMultipleActionTypes = 4;
     private const int SchemaVersionWithButtonColors = 5;
     private const int SchemaVersionWithButtonNames = 6;
+    private const int SchemaVersionWithKeyboardShortcuts = 7;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -150,13 +151,15 @@ public sealed class JsonProfileRepository : IProfileRepository
             && dto.SchemaVersion != SchemaVersionWithActions
             && dto.SchemaVersion != SchemaVersionWithMultipleActionTypes
             && dto.SchemaVersion != SchemaVersionWithButtonColors
-            && dto.SchemaVersion != SchemaVersionWithButtonNames)
+            && dto.SchemaVersion != SchemaVersionWithButtonNames
+            && dto.SchemaVersion != SchemaVersionWithKeyboardShortcuts)
         {
             throw new InvalidDataException(
                 $"El archivo de perfil '{filePath}' usa la versión de esquema {dto.SchemaVersion}, " +
                 "que no es compatible con las versiones soportadas " +
                 $"({SchemaVersionWithoutSlots}, {SchemaVersionWithSlots}, {SchemaVersionWithActions}, " +
-                $"{SchemaVersionWithMultipleActionTypes}, {SchemaVersionWithButtonColors} o {SchemaVersionWithButtonNames}).");
+                $"{SchemaVersionWithMultipleActionTypes}, {SchemaVersionWithButtonColors}, " +
+                $"{SchemaVersionWithButtonNames} o {SchemaVersionWithKeyboardShortcuts}).");
         }
 
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
@@ -409,12 +412,13 @@ public sealed class JsonProfileRepository : IProfileRepository
                         $"en la posición {actionDto.Position} de la página '{pageId}'.");
                 }
 
-                if (actionDto.Url is not null)
+                if (actionDto.Url is not null
+                    || (schemaVersion >= SchemaVersionWithKeyboardShortcuts
+                        && (actionDto.Key is not null || actionDto.Modifiers is not null)))
                 {
                     throw new InvalidDataException(
-                        $"El archivo de perfil '{filePath}' contiene una acción 'launchApplication' " +
-                        $"con una propiedad 'url' incompatible en la posición {actionDto.Position} " +
-                        $"de la página '{pageId}'.");
+                        $"El archivo de perfil '{filePath}' contiene propiedades incompatibles en la acción " +
+                        $"'launchApplication' de la posición {actionDto.Position} de la página '{pageId}'.");
                 }
 
                 try
@@ -436,12 +440,13 @@ public sealed class JsonProfileRepository : IProfileRepository
                         $"en la posición {actionDto.Position} de la página '{pageId}'.");
                 }
 
-                if (actionDto.ApplicationPath is not null)
+                if (actionDto.ApplicationPath is not null
+                    || (schemaVersion >= SchemaVersionWithKeyboardShortcuts
+                        && (actionDto.Key is not null || actionDto.Modifiers is not null)))
                 {
                     throw new InvalidDataException(
-                        $"El archivo de perfil '{filePath}' contiene una acción 'openUrl' " +
-                        $"con una propiedad 'applicationPath' incompatible en la posición {actionDto.Position} " +
-                        $"de la página '{pageId}'.");
+                        $"El archivo de perfil '{filePath}' contiene propiedades incompatibles en la acción " +
+                        $"'openUrl' de la posición {actionDto.Position} de la página '{pageId}'.");
                 }
 
                 try
@@ -452,6 +457,69 @@ public sealed class JsonProfileRepository : IProfileRepository
                 {
                     throw new InvalidDataException(
                         $"El archivo de perfil '{filePath}' contiene una acción inválida en la posición " +
+                        $"{actionDto.Position} de la página '{pageId}': {ex.Message}", ex);
+                }
+
+            case "keyboardShortcut" when schemaVersion >= SchemaVersionWithKeyboardShortcuts:
+                if (actionDto.Key is null)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una acción 'keyboardShortcut' sin 'key' " +
+                        $"en la posición {actionDto.Position} de la página '{pageId}'.");
+                }
+
+                if (actionDto.Modifiers is null)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una acción 'keyboardShortcut' sin 'modifiers' " +
+                        $"en la posición {actionDto.Position} de la página '{pageId}'.");
+                }
+
+                if (actionDto.ApplicationPath is not null || actionDto.Url is not null)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene propiedades incompatibles en la acción " +
+                        $"'keyboardShortcut' de la posición {actionDto.Position} de la página '{pageId}'.");
+                }
+
+                if (!Enum.TryParse<KeyboardKey>(actionDto.Key, ignoreCase: false, out var key)
+                    || !Enum.IsDefined(typeof(KeyboardKey), key))
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una tecla no admitida ('{actionDto.Key}') " +
+                        $"en la posición {actionDto.Position} de la página '{pageId}'.");
+                }
+
+                var modifiers = new List<KeyboardModifier>();
+                foreach (var modifierName in actionDto.Modifiers)
+                {
+                    if (modifierName is null
+                        || !Enum.TryParse<KeyboardModifier>(modifierName, ignoreCase: false, out var modifier)
+                        || !Enum.IsDefined(typeof(KeyboardModifier), modifier))
+                    {
+                        throw new InvalidDataException(
+                            $"El archivo de perfil '{filePath}' contiene un modificador no admitido " +
+                            $"('{modifierName}') en la posición {actionDto.Position} de la página '{pageId}'.");
+                    }
+
+                    if (modifiers.Contains(modifier))
+                    {
+                        throw new InvalidDataException(
+                            $"El archivo de perfil '{filePath}' contiene un modificador repetido " +
+                            $"('{modifierName}') en la posición {actionDto.Position} de la página '{pageId}'.");
+                    }
+
+                    modifiers.Add(modifier);
+                }
+
+                try
+                {
+                    return new KeyboardShortcutAction(key, modifiers);
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidDataException(
+                        $"El archivo de perfil '{filePath}' contiene una combinación de teclas inválida en la posición " +
                         $"{actionDto.Position} de la página '{pageId}': {ex.Message}", ex);
                 }
 

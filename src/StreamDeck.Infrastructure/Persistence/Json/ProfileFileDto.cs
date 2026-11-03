@@ -18,7 +18,7 @@ internal sealed class ProfileFileDto
     {
         return new ProfileFileDto
         {
-            SchemaVersion = 6,
+            SchemaVersion = 7,
             Id = profile.Id,
             Name = profile.Name,
             Pages = profile.Pages.Select(page => new PageDto
@@ -66,6 +66,13 @@ internal sealed class ProfileFileDto
                 Type = "openUrl",
                 Url = openUrl.Url,
             },
+            KeyboardShortcutAction keyboardShortcut => new ActionDto
+            {
+                Position = slot.Position,
+                Type = "keyboardShortcut",
+                Key = keyboardShortcut.Key.ToString(),
+                Modifiers = keyboardShortcut.Modifiers.Select(modifier => modifier.ToString()).ToList(),
+            },
             _ => throw new NotSupportedException(
                 $"El tipo de acción '{slot.Action?.GetType().Name}' en la posición {slot.Position} " +
                 "no está soportado por la persistencia."),
@@ -101,6 +108,12 @@ internal sealed class ActionDto
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Url { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Key { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Modifiers { get; set; }
 }
 
 internal sealed class SlotColorDto

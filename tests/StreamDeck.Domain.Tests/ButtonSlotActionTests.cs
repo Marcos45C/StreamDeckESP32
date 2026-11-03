@@ -76,6 +76,20 @@ public class ButtonSlotActionTests
         Assert.Equal("/usr/bin/firefox", action.ApplicationPath);
     }
     [Fact]
+    public void AssignAction_WithKeyboardShortcutAction_SetsAction()
+    {
+        var profile = Profile.Create("Mi perfil");
+        var slot = profile.Pages[0].Slots[0];
+        var action = new KeyboardShortcutAction(
+            KeyboardKey.C,
+            new[] { KeyboardModifier.Ctrl });
+
+        slot.AssignAction(action);
+
+        Assert.Same(action, slot.Action);
+    }
+
+    [Fact]
     public void AssigningActionToOneSlot_DoesNotAffectAnotherSlot()
     {
         var profile = Profile.Create("Mi perfil");

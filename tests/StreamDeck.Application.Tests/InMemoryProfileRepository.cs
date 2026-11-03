@@ -88,6 +88,12 @@ internal sealed class InMemoryProfileRepository : IProfileRepository
                     case OpenUrlAction openUrl:
                         clonedSlot.AssignAction(new OpenUrlAction(openUrl.Url));
                         break;
+
+                    case KeyboardShortcutAction keyboardShortcut:
+                        clonedSlot.AssignAction(new KeyboardShortcutAction(
+                            keyboardShortcut.Key,
+                            keyboardShortcut.Modifiers));
+                        break;
                 }
             }
         }

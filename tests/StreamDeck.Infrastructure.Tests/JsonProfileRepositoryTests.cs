@@ -89,7 +89,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
 
-        Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(7, root.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(profile.Id, root.GetProperty("id").GetGuid());
         Assert.Equal("Mi perfil", root.GetProperty("name").GetString());
 
@@ -301,7 +301,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion6()
+    public async Task SaveAsync_AfterReadingSchemaVersion1Profile_WritesSchemaVersion7()
     {
         var id = Guid.NewGuid();
         var pageId = Guid.NewGuid();
@@ -319,7 +319,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
 
         var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{id}.json"));
 
-        Assert.Contains("\"schemaVersion\": 6", json);
+        Assert.Contains("\"schemaVersion\": 7", json);
         Assert.Contains("\"slotPositions\"", json);
         Assert.Contains("\"actions\"", json);
     }
@@ -715,6 +715,178 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
     }
 
+
+    [Fact]
+    public async Task SaveAsync_WithKeyboardShortcutAction_WritesSchemaVersion7WithoutOtherActionFields()
+    {
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].AssignAction(new KeyboardShortcutAction(
+            KeyboardKey.S,
+            new[] { KeyboardModifier.Ctrl, KeyboardModifier.Shift }));
+
+        await _repository.SaveAsync(profile);
+        var json = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{profile.Id}.json"));
+
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.Equal(7, root.GetProperty("schemaVersion").GetInt32());
+
+        var action = root.GetProperty("pages")[0].GetProperty("actions")[0];
+        Assert.Equal("keyboardShortcut", action.GetProperty("type").GetString());
+        Assert.Equal("S", action.GetProperty("key").GetString());
+        Assert.Equal(
+            new[] { "Ctrl", "Shift" },
+            action.GetProperty("modifiers").EnumerateArray().Select(value => value.GetString()));
+        Assert.False(action.TryGetProperty("applicationPath", out _));
+        Assert.False(action.TryGetProperty("url", out _));
+    }
+
+    [Fact]
+    public async Task SaveAsync_ThenGetByIdAsync_PreservesKeyboardShortcutAction()
+    {
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].AssignAction(new KeyboardShortcutAction(
+            KeyboardKey.C,
+            new[] { KeyboardModifier.Ctrl }));
+
+        await _repository.SaveAsync(profile);
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        var action = Assert.IsType<KeyboardShortcutAction>(loaded!.Pages[0].Slots[0].Action);
+        Assert.Equal(KeyboardKey.C, action.Key);
+        Assert.Equal(new[] { KeyboardModifier.Ctrl }, action.Modifiers);
+    }
+
+    [Fact]
+    public async Task SaveAsync_ThenGetByIdAsync_PreservesAllActionTypesInSameProfile()
+    {
+        var profile = Profile.Create("Mi perfil");
+        var slots = profile.Pages[0].Slots;
+        slots[0].AssignAction(new LaunchApplicationAction("/usr/bin/firefox"));
+        slots[1].AssignAction(new OpenUrlAction("https://example.com"));
+        slots[2].AssignAction(new KeyboardShortcutAction(
+            KeyboardKey.V,
+            new[] { KeyboardModifier.Ctrl }));
+
+        await _repository.SaveAsync(profile);
+        var loaded = await _repository.GetByIdAsync(profile.Id);
+
+        Assert.IsType<LaunchApplicationAction>(loaded!.Pages[0].Slots[0].Action);
+        Assert.IsType<OpenUrlAction>(loaded.Pages[0].Slots[1].Action);
+        var shortcut = Assert.IsType<KeyboardShortcutAction>(loaded.Pages[0].Slots[2].Action);
+        Assert.Equal(KeyboardKey.V, shortcut.Key);
+        Assert.Equal(new[] { KeyboardModifier.Ctrl }, shortcut.Modifiers);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion6File_PreservesExistingDataWithoutKeyboardAction()
+    {
+        var id = Guid.NewGuid();
+        var pageId = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 6,
+          "id": "{{id}}",
+          "name": "Perfil anterior",
+          "pages": [
+            {
+              "id": "{{pageId}}",
+              "name": "Página 1",
+              "slotPositions": [1,2,3,4,5,6,7,8,9],
+              "actions": [
+                { "position": 1, "type": "openUrl", "url": "https://example.com" }
+              ],
+              "slotColors": [
+                { "position": 1, "colorHex": "#2F5F91" }
+              ],
+              "slotNames": [
+                { "position": 1, "name": "Navegador" }
+              ]
+            }
+          ]
+        }
+        """);
+
+        var loaded = await _repository.GetByIdAsync(id);
+
+        Assert.NotNull(loaded);
+        Assert.IsType<OpenUrlAction>(loaded!.Pages[0].Slots[0].Action);
+        Assert.Equal("#2F5F91", loaded.Pages[0].Slots[0].ColorHex);
+        Assert.Equal("Navegador", loaded.Pages[0].Slots[0].CustomName);
+
+        // La lectura no modifica el archivo. Un guardado explícito sí lo actualiza a v7.
+        await _repository.SaveAsync(loaded);
+        var upgradedJson = await File.ReadAllTextAsync(Path.Combine(_tempDirectory, $"{id}.json"));
+        using var upgradedDocument = JsonDocument.Parse(upgradedJson);
+        Assert.Equal(7, upgradedDocument.RootElement.GetProperty("schemaVersion").GetInt32());
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WithSchemaVersion6KeyboardShortcutAction_ThrowsInvalidDataException()
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 6,
+          "id": "{{id}}",
+          "name": "Perfil anterior",
+          "pages": [
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "name": "Página 1",
+              "slotPositions": [1,2,3,4,5,6,7,8,9],
+              "actions": [
+                {
+                  "position": 1,
+                  "type": "keyboardShortcut",
+                  "key": "C",
+                  "modifiers": ["Ctrl"]
+                }
+              ],
+              "slotColors": [],
+              "slotNames": []
+            }
+          ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
+    [Theory]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "modifiers": [] } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "C" } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "NotAKey", "modifiers": [] } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "C", "modifiers": ["Unknown"] } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "C", "modifiers": ["Ctrl", "Ctrl"] } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "C", "modifiers": null } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "C", "modifiers": [], "applicationPath": "/usr/bin/firefox" } ]""")]
+    [InlineData("""[ { "position": 1, "type": "keyboardShortcut", "key": "C", "modifiers": [], "url": "https://example.com" } ]""")]
+    public async Task GetByIdAsync_WithSchemaVersion7InvalidKeyboardShortcut_ThrowsInvalidDataException(
+        string actionsJson)
+    {
+        var id = Guid.NewGuid();
+        await WriteRawJsonAsync(id, $$"""
+        {
+          "schemaVersion": 7,
+          "id": "{{id}}",
+          "name": "Perfil",
+          "pages": [
+            {
+              "id": "{{Guid.NewGuid()}}",
+              "name": "Página 1",
+              "slotPositions": [1,2,3,4,5,6,7,8,9],
+              "actions": {{actionsJson}},
+              "slotColors": [],
+              "slotNames": []
+            }
+          ]
+        }
+        """);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _repository.GetByIdAsync(id));
+    }
+
     private async Task WriteRawJsonAsync(Guid id, string json)
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -811,7 +983,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveAsync_WithButtonColors_WritesSchemaVersion6AndPreservesColors()
+    public async Task SaveAsync_WithButtonColors_WritesSchemaVersion7AndPreservesColors()
     {
         var profile = Profile.Create("Mi perfil");
         profile.Pages[0].Slots[0].SetColor("#2f5f91");
@@ -825,7 +997,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
-        Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(7, root.GetProperty("schemaVersion").GetInt32());
 
         var colors = root.GetProperty("pages")[0].GetProperty("slotColors");
         Assert.Equal(2, colors.GetArrayLength());
@@ -939,7 +1111,7 @@ public sealed class JsonProfileRepositoryTests : IDisposable
         Assert.All(loaded.Pages[0].Slots, s => Assert.Null(s.Action));
     }
     [Fact]
-public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion6WithUrlAndNoApplicationPath()
+public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion7WithUrlAndNoApplicationPath()
 {
     var profile = Profile.Create("Mi perfil");
     profile.Pages[0].Slots[0].AssignAction(new OpenUrlAction("https://example.com"));
@@ -949,7 +1121,7 @@ public async Task SaveAsync_WithOpenUrlAction_WritesSchemaVersion6WithUrlAndNoAp
 
     using var document = JsonDocument.Parse(json);
     var root = document.RootElement;
-    Assert.Equal(6, root.GetProperty("schemaVersion").GetInt32());
+    Assert.Equal(7, root.GetProperty("schemaVersion").GetInt32());
     var actionElement = root.GetProperty("pages")[0].GetProperty("actions")[0];
 
     Assert.Equal("openUrl", actionElement.GetProperty("type").GetString());
