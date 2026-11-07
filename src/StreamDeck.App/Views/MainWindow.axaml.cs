@@ -12,6 +12,8 @@ public partial class MainWindow : Window
     private bool _isClosingForReal;
     private bool _isClosingAfterDisconnect;
 
+    public Func<Task>? ShutdownAsync { get; set; }
+
     public MainWindow()
     {
         InitializeComponent();
@@ -58,25 +60,40 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (DataContext is MainViewModel viewModel &&
-            (viewModel.DeviceState == DeviceConnectionState.Connected ||
-             viewModel.DeviceState == DeviceConnectionState.Connecting))
-        {
-            e.Cancel = true;
+        // Cancelamos el primer cierre para completar siempre la limpieza asíncrona:
+        // cola de pulsaciones, conexión serie y sesión RemoteDesktop si existe.
+        e.Cancel = true;
 
-            if (!_isClosingAfterDisconnect)
-            {
-                _isClosingAfterDisconnect = true;
-                _ = CloseAfterDisconnectingDeviceAsync(viewModel);
-            }
+        if (!_isClosingAfterDisconnect)
+        {
+            _isClosingAfterDisconnect = true;
+            _ = CompleteShutdownAsync();
         }
     }
 
-    private async Task CloseAfterDisconnectingDeviceAsync(MainViewModel viewModel)
+    private async Task CompleteShutdownAsync()
     {
-        await viewModel.DisconnectDeviceForShutdownAsync();
-        _isClosingForReal = true;
-        Close();
+        try
+        {
+            if (DataContext is MainViewModel viewModel)
+            {
+                await viewModel.DisconnectDeviceForShutdownAsync();
+            }
+
+            if (ShutdownAsync is not null)
+            {
+                await ShutdownAsync();
+            }
+        }
+        catch
+        {
+            // El cierre debe continuar incluso si falla la limpieza de un recurso.
+        }
+        finally
+        {
+            _isClosingForReal = true;
+            Close();
+        }
     }
 
     private async Task<string?> ShowProfileNameDialogAsync(string? currentName)

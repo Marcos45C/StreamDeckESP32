@@ -23,6 +23,8 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Mostrar StreamDeck ESP32"
                                         Click="OnShowMainWindowClicked" />
+                        <NativeMenuItem Header="Autorizar atajos de teclado (Linux Wayland)"
+                                        Click="OnAuthorizeKeyboardClicked" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Salir"
                                         Click="OnExitApplicationClicked" />

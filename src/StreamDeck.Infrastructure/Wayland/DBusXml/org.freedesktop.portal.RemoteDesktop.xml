@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<node>
+  <interface name="org.freedesktop.portal.RemoteDesktop">
+    <method name="CreateSession">
+      <arg name="options" type="a{sv}" direction="in" />
+      <arg name="handle" type="o" direction="out" />
+    </method>
+    <method name="SelectDevices">
+      <arg name="session_handle" type="o" direction="in" />
+      <arg name="options" type="a{sv}" direction="in" />
+      <arg name="handle" type="o" direction="out" />
+    </method>
+    <method name="Start">
+      <arg name="session_handle" type="o" direction="in" />
+      <arg name="parent_window" type="s" direction="in" />
+      <arg name="options" type="a{sv}" direction="in" />
+      <arg name="handle" type="o" direction="out" />
+    </method>
+  </interface>
+</node>

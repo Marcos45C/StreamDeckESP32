@@ -19,7 +19,8 @@ La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como 
 - Minimización a la bandeja del sistema: la ventana desaparece de la barra de tareas y permanece ejecutándose en segundo plano.
 - Icono propio en la bandeja con opciones para restaurar la ventana o salir de la aplicación.
 - Persistencia local de perfiles en archivos JSON.
-- Compatibilidad de lectura con los esquemas JSON anteriores (v1 a v5); los guardados actuales utilizan el esquema v6.
+- Modelo y persistencia de acciones de atajo de teclado (`keyboardShortcut`) en el esquema JSON v7. En esta etapa todavía no se envían eventos de teclado: se está incorporando primero la autorización segura de Wayland.
+- Compatibilidad de lectura con los esquemas JSON anteriores (v1 a v6); los guardados actuales utilizan el esquema v7.
 - Detección del puerto serie, conexión, handshake y recepción de las nueve pulsaciones físicas.
 - Ejecución de la acción correspondiente al perfil y página seleccionados cuando se pulsa un botón físico.
 - Interfaz de escritorio multiplataforma con tema oscuro.
@@ -34,6 +35,25 @@ Al minimizar la ventana, StreamDeck ESP32 oculta su entrada de la barra de tarea
 - **Fedora KDE Plasma:** el icono utiliza la bandeja del sistema de Plasma. En otros escritorios Linux, la disponibilidad depende del soporte de StatusNotifierItem/AppIndicator del entorno de escritorio.
 
 El botón **Cerrar (X)** de la ventana mantiene su comportamiento actual de salida de la aplicación. Para dejarla en segundo plano, utilizá **Minimizar**.
+
+### Autorización de teclado en Fedora KDE Wayland (etapa experimental)
+
+La aplicación incorpora una opción **Autorizar atajos de teclado (Linux Wayland)** en el menú del icono de la bandeja. Esta opción inicia el flujo de autorización del portal XDG RemoteDesktop y solicita exclusivamente el dispositivo **teclado**. No solicita control del mouse ni de la pantalla táctil.
+
+Esta etapa solamente prepara y mantiene la sesión autorizada. **Todavía no envía combinaciones de teclas**; el envío y la configuración visual se implementarán en etapas posteriores.
+
+Requisitos comprobados en el entorno de desarrollo:
+
+- Sesión de escritorio Wayland (`echo $XDG_SESSION_TYPE` debe devolver `wayland`).
+- Portal `org.freedesktop.portal.RemoteDesktop` versión 2 o superior.
+- La propiedad `AvailableDeviceTypes` debe incluir el bit de teclado (`1`).
+- Un backend XDG Desktop Portal del entorno de escritorio capaz de mostrar el diálogo de autorización.
+
+Para solicitar el permiso, iniciá StreamDeckESP32, abrí el menú de su icono de bandeja y seleccioná **Autorizar atajos de teclado (Linux Wayland)**. KDE presenta su diálogo de autorización. Si aceptás, la aplicación muestra el estado de autorización en la ventana principal y mantiene la sesión mientras la aplicación siga abierta. Minimizar a la bandeja no cierra la sesión. Al salir, la aplicación cierra la sesión RemoteDesktop.
+
+Si cancelás o denegás el diálogo, la aplicación informa que no se autorizó el teclado y permite volver a intentarlo desde el menú de la bandeja. Si KDE cierra la sesión o se pierde la conexión D-Bus, la aplicación informa que la autorización se perdió.
+
+Guía técnica: [`docs/linux-wayland-keyboard.md`](docs/linux-wayland-keyboard.md).
 
 ## Hardware actual
 
@@ -69,6 +89,7 @@ El antirrebote del firmware es de aproximadamente 30 ms y genera un evento por c
 - CommunityToolkit.Mvvm 8.4.2.
 - `System.IO.Ports` para la comunicación serie.
 - `System.Text.Json` para la persistencia local.
+- `Tmds.DBus.Protocol` y `Tmds.DBus.Generator` para la integración con XDG Desktop Portal en Linux Wayland.
 - PlatformIO + framework Arduino para el firmware del ESP32.
 
 ## Arquitectura del repositorio

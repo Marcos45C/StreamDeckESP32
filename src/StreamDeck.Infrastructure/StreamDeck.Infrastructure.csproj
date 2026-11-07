@@ -1,8 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\StreamDeck.Application\StreamDeck.Application.csproj" />
     <ProjectReference Include="..\StreamDeck.Domain\StreamDeck.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.95.1" />
+    <PackageReference Include="Tmds.DBus.Generator" Version="0.95.1" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="Wayland/DBusXml/*.xml"
+                     Namespace="StreamDeck.Infrastructure.Wayland.DBus"
+                     DBusGeneratorMode="Proxy" />
   </ItemGroup>
 
   <PropertyGroup>

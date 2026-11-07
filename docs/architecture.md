@@ -4,9 +4,9 @@
 
 | Proyecto | Responsabilidad | Depende de |
 |---|---|---|
-| `StreamDeck.Domain` | Perfiles, páginas, posiciones de botones, acciones, colores y nombres personalizados. Contiene las reglas y validaciones del dominio. | Ninguno interno |
+| `StreamDeck.Domain` | Perfiles, páginas, posiciones de botones, acciones (aplicaciones, URLs y modelo de atajos), colores y nombres personalizados. Contiene las reglas y validaciones del dominio. | Ninguno interno |
 | `StreamDeck.Application` | Casos de uso para perfiles y páginas, configuración de acciones y colores, ejecución de acciones e interfaces para los servicios externos. | Domain |
-| `StreamDeck.Infrastructure` | Persistencia JSON local y adaptadores del sistema operativo para ejecutar aplicaciones y abrir URLs. | Application, Domain |
+| `StreamDeck.Infrastructure` | Persistencia JSON local, adaptadores para ejecutar aplicaciones y abrir URLs, y sesión de autorización de teclado mediante XDG RemoteDesktop en Linux Wayland. | Application, Domain |
 | `StreamDeck.Device` | Enumeración, conexión y comunicación serie con el firmware ESP32. | Application, Domain |
 | `StreamDeck.App` | Interfaz Avalonia, ViewModels, diálogos, composición de dependencias y presentación de estados. | Application, Domain, Infrastructure, Device |
 
@@ -20,6 +20,9 @@ No hay dependencias circulares. `Domain` es la única capa sin dependencias inte
 - `Domain/Entities/ButtonAction.cs`: tipo base de acción.
 - `Domain/Entities/LaunchApplicationAction.cs`: ruta de una aplicación.
 - `Domain/Entities/OpenUrlAction.cs`: URL absoluta HTTP/HTTPS.
+- `Domain/Entities/KeyboardShortcutAction.cs`: combinación de modificadores y tecla principal; en la etapa actual es un modelo persistible, todavía sin envío de eventos.
+- `Application/Execution/IKeyboardInputSession.cs`: contrato de autorización de una sesión de teclado sin dependencias de D-Bus.
+- `Infrastructure/Execution/WaylandKeyboardInputSession.cs`: ciclo de vida de autorización del teclado con XDG RemoteDesktop.
 - `Application/Profiles/ProfileService.cs`: operaciones y persistencia de perfiles, acciones, colores y nombres de botones.
 - `Application/Execution/ButtonActionExecutionService.cs`: resuelve y ejecuta la acción asignada a una posición.
 - `Infrastructure/Persistence/Json/JsonProfileRepository.cs`: lectura y escritura atómica de archivos JSON.
@@ -29,7 +32,7 @@ No hay dependencias circulares. `Domain` es la única capa sin dependencias inte
 
 ## Persistencia JSON
 
-Cada perfil se guarda en un archivo independiente. El repositorio escribe actualmente `schemaVersion: 6`.
+Cada perfil se guarda en un archivo independiente. El repositorio escribe actualmente `schemaVersion: 7`.
 
 | Versión | Contenido agregado |
 |---:|---|
@@ -39,8 +42,9 @@ Cada perfil se guarda en un archivo independiente. El repositorio escribe actual
 | 4 | Acciones `openUrl` además de aplicaciones. |
 | 5 | Colores visuales opcionales para cada posición. |
 | 6 | Nombres personalizados opcionales para cada botón. |
+| 7 | Acciones `keyboardShortcut`, con tecla principal y modificadores.
 
-El repositorio mantiene lectura compatible con v1 a v5. Leer un archivo antiguo no lo modifica; al guardar ese perfil se escribe el esquema v6.
+El repositorio mantiene lectura compatible con v1 a v6. Leer un archivo antiguo no lo modifica; al guardar ese perfil se escribe el esquema v7.
 
 ## MVVM y composición
 
@@ -55,6 +59,7 @@ El repositorio mantiene lectura compatible con v1 a v5. Leer un archivo antiguo 
 - `StreamDeck.App`: Avalonia 12.1.4, CommunityToolkit.Mvvm 8.4.2 y paquetes de interfaz asociados.
 - `StreamDeck.Device`: `System.IO.Ports` 10.0.12.
 - Persistencia JSON: `System.Text.Json` incluido en .NET.
+- Integración D-Bus: `Tmds.DBus.Protocol` y `Tmds.DBus.Generator` 0.95.1 para los proxies del portal XDG en Linux.
 - Firmware: PlatformIO, plataforma `espressif32`, framework Arduino.
 
 Todos los proyectos C# apuntan a `net10.0`. `Directory.Build.props` centraliza `Nullable` e `ImplicitUsings`.
@@ -69,3 +74,9 @@ Todos los proyectos C# apuntan a `net10.0`. `Directory.Build.props` centraliza `
 ### Personalización visual de botones
 
 Cada `ButtonSlot` puede conservar un color hexadecimal y un nombre personalizado opcional. Los nombres se guardan en `slotNames` dentro del esquema JSON v6; los archivos v1–v5 siguen leyéndose y sus botones comienzan sin nombre personalizado. Esta personalización es exclusivamente visual y no cambia la posición física ni la acción del botón.
+
+### Autorización de teclado Wayland
+
+`WaylandKeyboardInputSession` administra la conexión al bus D-Bus de sesión y el ciclo `CreateSession` → `SelectDevices` → `Start` de `org.freedesktop.portal.RemoteDesktop`. Solicita únicamente `KEYBOARD` (`types = 1`) y `persist_mode = 1`, que mantiene el permiso mientras la aplicación está ejecutándose. La implementación observa el cierre de la sesión y la pérdida de la conexión D-Bus.
+
+La etapa 10.2 incorpora la autorización y su ciclo de vida; no implementa todavía `NotifyKeyboardKeysym`, `NotifyKeyboardKeycode` ni el envío de atajos.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<node>
+  <interface name="org.freedesktop.portal.Request">
+    <method name="Close" />
+    <signal name="Response">
+      <arg name="response" type="u" />
+      <arg name="results" type="a{sv}" />
+    </signal>
+  </interface>
+</node>

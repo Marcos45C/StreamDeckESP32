@@ -216,7 +216,7 @@
                     Background="{StaticResource TopBarBackgroundBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
                     BorderThickness="0,0,0,1">
-                <Grid RowDefinitions="Auto,Auto" Margin="24,8">
+                <Grid RowDefinitions="Auto,Auto,Auto" Margin="24,8">
 
                     <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
                         <TextBlock Grid.Column="0"
@@ -268,6 +268,14 @@
                                    FontSize="11"
                                    IsVisible="{Binding LastButtonActivityText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
+
+                    <TextBlock Grid.Row="2"
+                               Text="{Binding KeyboardAuthorizationStatusText}"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Margin="0,5,0,0"
+                               IsVisible="{Binding KeyboardAuthorizationStatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
                 </Grid>
             </Border>

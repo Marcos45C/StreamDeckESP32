@@ -130,6 +130,9 @@ public partial class MainViewModel : ViewModelBase
     public partial string? ErrorMessage { get; set; }
 
     [ObservableProperty]
+    public partial string? KeyboardAuthorizationStatusText { get; set; }
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectDeviceCommand))]
     [NotifyCanExecuteChangedFor(nameof(DisconnectDeviceCommand))]
     public partial bool IsDeviceBusy { get; set; }

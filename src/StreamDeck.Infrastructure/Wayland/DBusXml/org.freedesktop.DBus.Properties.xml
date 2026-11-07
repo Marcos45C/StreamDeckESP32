@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<node>
+  <interface name="org.freedesktop.DBus.Properties">
+    <method name="Get">
+      <arg name="interface_name" type="s" direction="in" />
+      <arg name="property_name" type="s" direction="in" />
+      <arg name="value" type="v" direction="out" />
+    </method>
+  </interface>
+</node>
