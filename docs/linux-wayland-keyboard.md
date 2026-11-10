@@ -67,7 +67,7 @@ Si el portal no está disponible, no informa versión suficiente o no ofrece tec
 
 En una sesión Linux Wayland, seleccioná un botón de la cuadrícula. Si no tiene acción, elegí **Atajo de teclado** en el panel de propiedades; si ya tiene una acción, elegí **Cambiar atajo de teclado**.
 
-El diálogo permite seleccionar los modificadores Ctrl, Alt, Shift y Super, además de una tecla principal. Se admiten letras, números, F1–F12 y teclas comunes de navegación y edición. También se puede configurar una tecla sin modificadores. Al guardar, el atajo queda persistido dentro de la acción del botón.
+El diálogo permite seleccionar uno o varios modificadores (Ctrl, Alt, Shift y Super), además de una tecla principal. `Shift` corresponde a la tecla **Mayús**. Por ejemplo, se puede configurar `Alt + Shift + F4` además de combinaciones como `Ctrl + C` o `Super + D`. Se admiten letras, números, F1–F12 y teclas comunes de navegación y edición. También se puede configurar una tecla sin modificadores. Al guardar, el atajo queda persistido dentro de la acción del botón.
 
 Para ejecutar el atajo, el teclado debe estar autorizado previamente desde el menú del icono de la bandeja. Los atajos se prueban con el botón físico del ESP32 mientras la aplicación de destino está en primer plano; el botón **Probar acción** del panel se oculta para los atajos porque al pulsarlo la propia ventana StreamDeckESP32 tendría el foco.
 

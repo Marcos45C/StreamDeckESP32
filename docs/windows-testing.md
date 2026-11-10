@@ -76,6 +76,8 @@ Si el CP2102 aparece como dispositivo desconocido o no se crea ningún puerto CO
 
 ## 4. Probar las acciones
 
+**Limitación actual de atajos:** aunque los perfiles pueden conservar acciones `keyboardShortcut`, la ejecución de combinaciones de teclado está implementada actualmente solo para Linux KDE Wayland. En Windows todavía no se envían atajos; esta capacidad requerirá un adaptador específico para Windows.
+
 - **Abrir URL:** configurá una dirección `https://` y probá la acción; Windows la abrirá con el navegador predeterminado.
 - **Ejecutar aplicación:** seleccioná un ejecutable de Windows (`.exe`). No reutilices rutas de Fedora como `/usr/bin/firefox`.
 - **Bandeja del sistema:** minimizá la ventana y verificá que desaparezca de la barra de tareas. El icono de StreamDeck ESP32 debe quedar en el área de notificaciones o dentro del panel de iconos ocultos. Desde su menú, elegí **Mostrar StreamDeck ESP32** para restaurar la ventana o **Salir** para cerrar la aplicación.

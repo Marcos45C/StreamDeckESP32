@@ -4,7 +4,7 @@ Aplicación de escritorio para configurar y administrar un **Stream Deck físico
 
 La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como un dispositivo de entrada: detecta las pulsaciones y envía la posición del botón por USB/serie. No es un Stream Deck virtual y el firmware no almacena las configuraciones.
 
-> Estado del proyecto: la conexión serie, las nueve pulsaciones, las acciones de aplicaciones/URLs y la paleta de colores ya fueron probadas en Fedora KDE con una placa ESP32 DevKit V1 / ESP-WROOM-32 con CP2102. La minimización a la bandeja del sistema ya fue probada en Fedora KDE y Windows.
+> Estado del proyecto: la conexión serie, las nueve pulsaciones, las acciones de aplicaciones/URLs, los colores, los nombres personalizados, la bandeja del sistema y los atajos de teclado fueron probados en Fedora KDE Wayland con una placa ESP32 DevKit V1 / ESP-WROOM-32 con CP2102. La bandeja del sistema también fue probada en Windows. La ejecución de atajos está disponible actualmente solo en Linux Wayland.
 
 ## Funcionalidades implementadas
 
@@ -13,8 +13,8 @@ La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como 
 - Asignación, modificación y eliminación de acciones por botón.
 - Acción **Ejecutar aplicación**, usando la ruta del ejecutable correspondiente al sistema operativo.
 - Acción **Abrir URL**, limitada a direcciones HTTP y HTTPS.
-- Acción **Atajo de teclado** para Linux KDE Wayland: permite seleccionar Ctrl, Alt, Shift o Super y una tecla principal desde el panel de propiedades. La ejecución utiliza la sesión de teclado autorizada mediante XDG RemoteDesktop.
-- Prueba manual de una acción desde la aplicación.
+- Acción **Atajo de teclado** para Linux KDE Wayland: permite seleccionar uno o varios modificadores (Ctrl, Alt, Shift/Mayús o Super) junto con una tecla principal. Por ejemplo, `Alt + Shift + F4` es una combinación válida. La ejecución utiliza la sesión de teclado autorizada mediante XDG RemoteDesktop.
+- Ejecución de combinaciones de teclas en Linux KDE Wayland mediante la sesión autorizada de XDG RemoteDesktop.
 - Ocho colores configurables por botón, independientes de la acción asignada.
 - Nombre personalizado por botón: doble clic sobre un botón para editarlo o restablecer el nombre predeterminado.
 - Minimización a la bandeja del sistema: la ventana desaparece de la barra de tareas y permanece ejecutándose en segundo plano.
@@ -37,24 +37,24 @@ Al minimizar la ventana, StreamDeck ESP32 oculta su entrada de la barra de tarea
 
 El botón **Cerrar (X)** de la ventana mantiene su comportamiento actual de salida de la aplicación. Para dejarla en segundo plano, utilizá **Minimizar**.
 
-### Autorización de teclado en Fedora KDE Wayland (etapa experimental)
+### Atajos de teclado en Fedora KDE Wayland
 
-La aplicación incorpora una opción **Autorizar atajos de teclado (Linux Wayland)** en el menú del icono de la bandeja. Esta opción inicia el flujo de autorización del portal XDG RemoteDesktop y solicita exclusivamente el dispositivo **teclado**. No solicita control del mouse ni de la pantalla táctil.
+Los atajos de teclado están implementados para sesiones Linux Wayland. Para utilizarlos:
 
-Esta etapa solamente prepara y mantiene la sesión autorizada. **Todavía no envía combinaciones de teclas**; el envío y la configuración visual se implementarán en etapas posteriores.
+1. Iniciá StreamDeckESP32 en una sesión Wayland (`echo $XDG_SESSION_TYPE` debe devolver `wayland`).
+2. Abrí el menú del icono de StreamDeckESP32 en la bandeja y seleccioná **Autorizar atajos de teclado (Linux Wayland)**.
+3. Aceptá en KDE la solicitud de acceso al teclado. La aplicación solicita exclusivamente el dispositivo teclado; no pide control del mouse ni de la pantalla táctil.
+4. Seleccioná un botón de la cuadrícula y elegí **Atajo de teclado** o **Cambiar atajo de teclado** en el panel de propiedades.
+5. Elegí uno o varios modificadores y una tecla principal. `Shift` es la tecla **Mayús**. Por ejemplo, podés configurar `Alt + Shift + F4`, `Ctrl + C` o `Super + D`.
+6. Guardá el atajo y probalo con el botón físico mientras la aplicación de destino esté en primer plano.
 
-Requisitos comprobados en el entorno de desarrollo:
+La autorización se mantiene durante la ejecución de StreamDeckESP32 si el portal concede el modo de persistencia solicitado. Minimizar la ventana a la bandeja no cierra la sesión. Al salir, la aplicación cierra la sesión RemoteDesktop. Si KDE revoca o cierra la sesión, hay que volver a solicitar la autorización.
 
-- Sesión de escritorio Wayland (`echo $XDG_SESSION_TYPE` debe devolver `wayland`).
-- Portal `org.freedesktop.portal.RemoteDesktop` versión 2 o superior.
-- La propiedad `AvailableDeviceTypes` debe incluir el bit de teclado (`1`).
-- Un backend XDG Desktop Portal del entorno de escritorio capaz de mostrar el diálogo de autorización.
+El botón **Probar acción** del panel no se muestra para atajos, porque al utilizarlo la propia ventana de StreamDeckESP32 tendría el foco. Los atajos se envían a la aplicación que esté en primer plano cuando se presiona el botón físico.
 
-Para solicitar el permiso, iniciá StreamDeckESP32, abrí el menú de su icono de bandeja y seleccioná **Autorizar atajos de teclado (Linux Wayland)**. KDE presenta su diálogo de autorización. Si aceptás, la aplicación muestra el estado de autorización en la ventana principal y mantiene la sesión mientras la aplicación siga abierta. Minimizar a la bandeja no cierra la sesión. Al salir, la aplicación cierra la sesión RemoteDesktop.
+La ejecución de atajos todavía no está disponible en Windows ni en Linux X11. La configuración se conserva en los perfiles mediante el esquema JSON v7, pero su ejecución está implementada actualmente solo para Linux Wayland.
 
-Si cancelás o denegás el diálogo, la aplicación informa que no se autorizó el teclado y permite volver a intentarlo desde el menú de la bandeja. Si KDE cierra la sesión o se pierde la conexión D-Bus, la aplicación informa que la autorización se perdió.
-
-Guía técnica: [`docs/linux-wayland-keyboard.md`](docs/linux-wayland-keyboard.md).
+Guía técnica y solución de problemas: [`docs/linux-wayland-keyboard.md`](docs/linux-wayland-keyboard.md).
 
 ## Hardware actual
 
@@ -102,6 +102,7 @@ StreamDeckESP32/
 ├── README.md
 ├── docs/
 │   ├── architecture.md
+│   ├── linux-wayland-keyboard.md
 │   ├── serial-protocol-v1.md
 │   └── windows-testing.md
 ├── firmware/
@@ -213,8 +214,3 @@ Los perfiles pueden respaldarse copiando esa carpeta. Tené presente que las rut
 El hardware se mantiene intencionalmente simple: nueve pulsadores conectados al ESP32, sin pantalla, sin LEDs y sin necesidad de una placa distinta. Las mejoras visuales actuales pertenecen al software de escritorio.
 
 No se implementaron todavía instaladores MSI/EXE, actualización automática, sincronización en la nube, macros, soporte de atajos para Windows ni imágenes personalizadas para los botones.
-
-
-## Atajos de teclado en Linux Wayland
-
-La etapa 10.2 solicita autorización de teclado con XDG RemoteDesktop. La etapa 10.3 envía las combinaciones autorizadas mediante `NotifyKeyboardKeysym`, liberando las teclas después de cada combinación. La etapa 10.4 agrega el modal para configurar cada atajo: se pueden elegir los modificadores Ctrl, Alt, Shift y Super, junto con una tecla principal de la lista admitida. La configuración se guarda en el perfil y se muestra también en la cuadrícula de botones.
