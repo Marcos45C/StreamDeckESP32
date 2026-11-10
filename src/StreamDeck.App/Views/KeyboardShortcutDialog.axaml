@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="StreamDeck.App.Views.KeyboardShortcutDialog"
+        Title="Atajo de teclado"
+        Width="440" Height="330"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E22"
+        KeyDown="OnKeyDown">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="22">
+        <TextBlock Grid.Row="0"
+                   Text="Configurar atajo de teclado"
+                   Foreground="#E4E4E7"
+                   FontSize="15"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,14" />
+
+        <StackPanel Grid.Row="1" Spacing="8">
+            <TextBlock Text="MODIFICADORES"
+                       Foreground="#8E8E96"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                <CheckBox Grid.Row="0" Grid.Column="0" Name="CtrlCheckBox" Content="Ctrl" />
+                <CheckBox Grid.Row="0" Grid.Column="1" Name="AltCheckBox" Content="Alt" />
+                <CheckBox Grid.Row="1" Grid.Column="0" Name="ShiftCheckBox" Content="Shift" />
+                <CheckBox Grid.Row="1" Grid.Column="1" Name="SuperCheckBox" Content="Super (tecla Windows)" />
+            </Grid>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Margin="0,14,0,0" Spacing="7">
+            <TextBlock Text="TECLA PRINCIPAL"
+                       Foreground="#8E8E96"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <ComboBox Name="KeyComboBox"
+                      HorizontalAlignment="Stretch"
+                      PlaceholderText="Seleccionar tecla…" />
+            <TextBlock Text="Ejemplo: Ctrl + Shift + C. Podés elegir una tecla sin modificadores."
+                       Foreground="#8E8E96"
+                       FontSize="10.5"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="3"
+                   Name="ErrorTextBlock"
+                   Foreground="#E88A8A"
+                   FontSize="11"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   IsVisible="False" />
+
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Spacing="8">
+            <Button Content="Cancelar" Click="OnCancelClick" />
+            <Button Content="Guardar atajo" Click="OnSaveClick" />
+        </StackPanel>
+    </Grid>
+</Window>

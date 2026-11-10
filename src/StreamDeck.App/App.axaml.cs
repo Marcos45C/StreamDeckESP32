@@ -31,8 +31,6 @@ public partial class App : Avalonia.Application
             var profileService = new ProfileService(profileRepository);
             var applicationLauncher = new SystemApplicationLauncher();
             var urlLauncher = new SystemUrlLauncher();
-            var buttonActionExecutionService = new ButtonActionExecutionService(
-                profileRepository, applicationLauncher, urlLauncher);
             var deviceConnection = new SerialDeviceConnection();
 
             if (OperatingSystem.IsLinux())
@@ -40,6 +38,9 @@ public partial class App : Avalonia.Application
                 _keyboardInputSession = new WaylandKeyboardInputSession();
                 _keyboardInputSession.AuthorizationLost += OnKeyboardAuthorizationLost;
             }
+
+            var buttonActionExecutionService = new ButtonActionExecutionService(
+                profileRepository, applicationLauncher, urlLauncher, _keyboardInputSession);
 
             _mainWindow = new MainWindow
             {

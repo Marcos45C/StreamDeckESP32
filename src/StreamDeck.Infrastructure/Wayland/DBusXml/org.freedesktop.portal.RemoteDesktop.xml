@@ -16,5 +16,11 @@
       <arg name="options" type="a{sv}" direction="in" />
       <arg name="handle" type="o" direction="out" />
     </method>
+    <method name="NotifyKeyboardKeysym">
+      <arg name="session_handle" type="o" direction="in" />
+      <arg name="options" type="a{sv}" direction="in" />
+      <arg name="keysym" type="i" direction="in" />
+      <arg name="state" type="u" direction="in" />
+    </method>
   </interface>
 </node>

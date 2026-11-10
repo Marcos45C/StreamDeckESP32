@@ -7,7 +7,7 @@ namespace StreamDeck.App.Converters;
 /// <summary>
 /// Convierte el ButtonAction? de un ButtonSlot en el texto secundario que se muestra
 /// en la grilla: "Sin configurar" si está vacío, el nombre del ejecutable para una
-/// LaunchApplicationAction o el host para una OpenUrlAction.
+/// LaunchApplicationAction, el host para OpenUrlAction o la combinación de teclas configurada.
 /// </summary>
 public sealed class ButtonActionStatusConverter : IValueConverter
 {
@@ -19,6 +19,7 @@ public sealed class ButtonActionStatusConverter : IValueConverter
         {
             LaunchApplicationAction launch => GetDisplayName(launch.ApplicationPath),
             OpenUrlAction openUrl => GetUrlDisplayName(openUrl.Url),
+            KeyboardShortcutAction shortcut => KeyboardShortcutDisplayFormatter.Format(shortcut),
             null => "Sin configurar",
             _ => "Configurado",
         };

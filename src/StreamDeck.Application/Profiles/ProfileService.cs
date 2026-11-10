@@ -112,6 +112,23 @@ public sealed class ProfileService
         await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task AssignKeyboardShortcutActionAsync(
+        Guid profileId,
+        Guid pageId,
+        int position,
+        KeyboardShortcutAction action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        var profile = await GetProfileOrThrowAsync(profileId, cancellationToken).ConfigureAwait(false);
+        var page = FindPageOrThrow(profile, pageId);
+        var slot = FindSlotOrThrow(page, position);
+
+        slot.AssignAction(action);
+        await _repository.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task SetButtonColorAsync(
         Guid profileId,
         Guid pageId,

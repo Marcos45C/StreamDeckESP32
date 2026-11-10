@@ -476,6 +476,46 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public async Task AssignKeyboardShortcutActionAsync_AssignsActionAndPersists()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+        var shortcut = new KeyboardShortcutAction(
+            KeyboardKey.C,
+            new[] { KeyboardModifier.Ctrl, KeyboardModifier.Shift });
+
+        await service.AssignKeyboardShortcutActionAsync(
+            profile.Id, profile.Pages[0].Id, 1, shortcut);
+
+        Assert.Equal(saveCountBefore + 1, repository.SaveCallCount);
+
+        var persisted = await repository.GetByIdAsync(profile.Id);
+        var action = Assert.IsType<KeyboardShortcutAction>(
+            persisted!.Pages[0].Slots.First(s => s.Position == 1).Action);
+        Assert.Equal(KeyboardKey.C, action.Key);
+        Assert.Equal(new[] { KeyboardModifier.Ctrl, KeyboardModifier.Shift }, action.Modifiers);
+    }
+
+    [Fact]
+    public async Task AssignKeyboardShortcutActionAsync_WithNullAction_ThrowsAndDoesNotCallSave()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        await repository.SaveAsync(profile);
+        var service = new ProfileService(repository);
+        var saveCountBefore = repository.SaveCallCount;
+
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => service.AssignKeyboardShortcutActionAsync(
+                profile.Id, profile.Pages[0].Id, 1, null!));
+
+        Assert.Equal(saveCountBefore, repository.SaveCallCount);
+    }
+
+    [Fact]
     public async Task AssignOpenUrlActionAsync_WithInvalidUrl_PropagatesArgumentExceptionAndDoesNotCallSave()
     {
         var repository = new InMemoryProfileRepository();

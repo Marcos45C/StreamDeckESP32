@@ -112,12 +112,15 @@ public sealed class RemoteDesktopResponseValidatorTests
         RemoteDesktopResponseValidator.EnsureKeyboardOnlyGranted(results);
     }
 
-    [Fact]
-    public void EnsureKeyboardOnlyGranted_WhenKeyboardIsNotGranted_ThrowsAuthorizationDenied()
+    [Theory]
+    [InlineData(RemoteDesktopResponseValidator.PointerDeviceType)]
+    [InlineData(RemoteDesktopResponseValidator.TouchscreenDeviceType)]
+    [InlineData(8u)] // Unknown capability without keyboard: authorization is still unavailable.
+    public void EnsureKeyboardOnlyGranted_WhenKeyboardIsNotGranted_ThrowsAuthorizationDenied(uint devices)
     {
         var results = new Dictionary<string, VariantValue>
         {
-            ["devices"] = (uint)RemoteDesktopResponseValidator.PointerDeviceType,
+            ["devices"] = devices,
         };
 
         Assert.Throws<KeyboardAuthorizationDeniedException>(
@@ -128,7 +131,6 @@ public sealed class RemoteDesktopResponseValidatorTests
     [InlineData(3)]
     [InlineData(5)]
     [InlineData(7)]
-    [InlineData(8)]
     [InlineData(9)]
     public void EnsureKeyboardOnlyGranted_WhenUnexpectedDeviceIsGranted_ThrowsInvalidData(uint devices)
     {

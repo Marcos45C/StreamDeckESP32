@@ -75,4 +75,68 @@ public class ButtonActionExecutionServiceTests
         Assert.Equal(0, applicationLauncher.LaunchCallCount);
         Assert.Equal(0, urlLauncher.OpenCallCount);
     }
+    [Fact]
+    public async Task ExecuteAsync_WithKeyboardShortcutAction_DelegatesToAuthorizedKeyboardSession()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        var action = new KeyboardShortcutAction(
+            KeyboardKey.C,
+            [KeyboardModifier.Ctrl, KeyboardModifier.Shift]);
+        profile.Pages[0].Slots[0].AssignAction(action);
+        await repository.SaveAsync(profile);
+
+        var keyboardSession = new FakeKeyboardInputSession { IsAuthorized = true };
+        var service = new ButtonActionExecutionService(
+            repository,
+            new FakeApplicationLauncher(),
+            new FakeUrlLauncher(),
+            keyboardSession);
+
+        await service.ExecuteAsync(profile.Id, profile.Pages[0].Id, 1);
+
+        Assert.Equal(1, keyboardSession.SendShortcutCallCount);
+        Assert.NotNull(keyboardSession.LastAction);
+        Assert.Equal(action.Key, keyboardSession.LastAction!.Key);
+        Assert.Equal(action.Modifiers.ToArray(), keyboardSession.LastAction!.Modifiers.ToArray());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithKeyboardShortcutActionAndUnauthorizedSession_ThrowsAuthorizationDenied()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].AssignAction(new KeyboardShortcutAction(KeyboardKey.C, [KeyboardModifier.Ctrl]));
+        await repository.SaveAsync(profile);
+
+        var keyboardSession = new FakeKeyboardInputSession { IsAuthorized = false };
+        var service = new ButtonActionExecutionService(
+            repository,
+            new FakeApplicationLauncher(),
+            new FakeUrlLauncher(),
+            keyboardSession);
+
+        await Assert.ThrowsAsync<KeyboardAuthorizationDeniedException>(
+            () => service.ExecuteAsync(profile.Id, profile.Pages[0].Id, 1));
+
+        Assert.Equal(0, keyboardSession.SendShortcutCallCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithKeyboardShortcutActionAndNoKeyboardSession_ThrowsAuthorizationDenied()
+    {
+        var repository = new InMemoryProfileRepository();
+        var profile = Profile.Create("Mi perfil");
+        profile.Pages[0].Slots[0].AssignAction(new KeyboardShortcutAction(KeyboardKey.C, [KeyboardModifier.Ctrl]));
+        await repository.SaveAsync(profile);
+
+        var service = new ButtonActionExecutionService(
+            repository,
+            new FakeApplicationLauncher(),
+            new FakeUrlLauncher());
+
+        await Assert.ThrowsAsync<KeyboardAuthorizationDeniedException>(
+            () => service.ExecuteAsync(profile.Id, profile.Pages[0].Id, 1));
+    }
+
 }

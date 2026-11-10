@@ -8,11 +8,13 @@ public sealed class ButtonActionExecutionService
     private readonly IProfileRepository _repository;
     private readonly IApplicationLauncher _applicationLauncher;
     private readonly IUrlLauncher _urlLauncher;
+    private readonly IKeyboardInputSession? _keyboardInputSession;
 
     public ButtonActionExecutionService(
         IProfileRepository repository,
         IApplicationLauncher applicationLauncher,
-        IUrlLauncher urlLauncher)
+        IUrlLauncher urlLauncher,
+        IKeyboardInputSession? keyboardInputSession = null)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(applicationLauncher);
@@ -21,6 +23,7 @@ public sealed class ButtonActionExecutionService
         _repository = repository;
         _applicationLauncher = applicationLauncher;
         _urlLauncher = urlLauncher;
+        _keyboardInputSession = keyboardInputSession;
     }
 
     public async Task ExecuteAsync(
@@ -60,6 +63,23 @@ public sealed class ButtonActionExecutionService
 
             case OpenUrlAction openUrl:
                 _urlLauncher.Open(openUrl.Url);
+                break;
+
+            case KeyboardShortcutAction keyboardShortcut:
+                if (_keyboardInputSession is null)
+                {
+                    throw new KeyboardAuthorizationDeniedException(
+                        "La ejecución de atajos de teclado está disponible en Linux Wayland en esta etapa.");
+                }
+
+                if (!_keyboardInputSession.IsAuthorized)
+                {
+                    throw new KeyboardAuthorizationDeniedException(
+                        "El teclado no está autorizado. Usá 'Autorizar atajos de teclado' en el menú de la bandeja.");
+                }
+
+                await _keyboardInputSession.SendShortcutAsync(keyboardShortcut, cancellationToken)
+                    .ConfigureAwait(false);
                 break;
 
             default:

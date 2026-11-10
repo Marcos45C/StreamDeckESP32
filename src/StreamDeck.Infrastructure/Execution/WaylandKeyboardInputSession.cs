@@ -1,3 +1,4 @@
+using StreamDeck.Domain.Entities;
 using Tmds.DBus.Protocol;
 using StreamDeck.Application.Execution;
 using StreamDeck.Infrastructure.Wayland.DBus;
@@ -6,7 +7,7 @@ namespace StreamDeck.Infrastructure.Execution;
 
 /// <summary>
 /// Owns a RemoteDesktop portal session that is authorized for keyboard input only.
-/// This stage manages permission/session lifecycle; it does not send keyboard events.
+/// It manages the permission lifecycle and sends keyboard KeySym press/release events.
 /// </summary>
 public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
 {
@@ -27,6 +28,7 @@ public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
     private RemoteDesktop? _remoteDesktop;
     private Properties? _properties;
     private Session? _session;
+    private string? _sessionHandlePath;
     private IDisposable? _sessionClosedObserver;
 
     private bool _isAuthorized;
@@ -97,6 +99,52 @@ public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
         }
     }
 
+    public async Task SendShortcutAsync(
+        KeyboardShortcutAction action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnsureSupportedEnvironment();
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeStarted) != 0, this);
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeStarted) != 0, this);
+
+            bool isAuthorized;
+            bool sessionWasClosed;
+            lock (_stateLock)
+            {
+                isAuthorized = _isAuthorized;
+                sessionWasClosed = _sessionWasClosed;
+            }
+
+            if (!isAuthorized || sessionWasClosed)
+            {
+                throw new KeyboardAuthorizationDeniedException(
+                    "El teclado no está autorizado. Autorizalo desde el menú del icono de StreamDeck ESP32 antes de ejecutar atajos.");
+            }
+
+            var remoteDesktop = _remoteDesktop ?? throw new KeyboardAuthorizationDeniedException(
+                "La conexión con el portal de KDE ya no está disponible. Volvé a autorizar el teclado desde la bandeja.");
+            var sessionPath = _sessionHandlePath ?? throw new KeyboardAuthorizationDeniedException(
+                "La sesión de teclado no está disponible. Volvé a autorizarla desde la bandeja.");
+            var sessionHandle = new ObjectPath(sessionPath);
+            var options = new Dictionary<string, VariantValue>();
+
+            Task NotifyAsync(int keysym, uint state) =>
+                remoteDesktop.NotifyKeyboardKeysymAsync(sessionHandle, options, keysym, state);
+
+            await KeyboardShortcutSender.SendAsync(action, NotifyAsync, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private static void EnsureSupportedEnvironment()
     {
         if (!OperatingSystem.IsLinux())
@@ -131,6 +179,7 @@ public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
                     _connectionDisconnectedTask = null;
                     _remoteDesktop = null;
                     _properties = null;
+                    _sessionHandlePath = null;
                     _service = default;
                 }
             }
@@ -225,6 +274,7 @@ public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
         lock (_stateLock)
         {
             _session = session;
+            _sessionHandlePath = sessionPath;
             _sessionWasClosed = false;
             _isClosingSession = false;
         }
@@ -414,6 +464,7 @@ public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
             session = _session;
             closedObserver = _sessionClosedObserver;
             _session = null;
+            _sessionHandlePath = null;
             _sessionClosedObserver = null;
             _isAuthorized = false;
             _isClosingSession = true;
@@ -467,6 +518,7 @@ public sealed class WaylandKeyboardInputSession : IKeyboardInputSession
                 _service = default;
                 _remoteDesktop = null;
                 _properties = null;
+                _sessionHandlePath = null;
             }
         }
         finally

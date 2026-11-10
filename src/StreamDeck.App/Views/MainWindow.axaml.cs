@@ -50,6 +50,7 @@ public partial class MainWindow : Window
             viewModel.RequestApplicationPathAsync = ShowApplicationPathDialogAsync;
             viewModel.RequestUrlAsync = ShowOpenUrlDialogAsync;
             viewModel.RequestButtonNameAsync = ShowButtonNameDialogAsync;
+            viewModel.RequestKeyboardShortcutAsync = ShowKeyboardShortcutDialogAsync;
         }
     }
 
@@ -141,5 +142,11 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenUrlDialog(currentUrl);
         return await dialog.ShowDialog<string?>(this);
+    }
+
+    private async Task<KeyboardShortcutAction?> ShowKeyboardShortcutDialogAsync(KeyboardShortcutAction? currentAction)
+    {
+        var dialog = new KeyboardShortcutDialog(currentAction);
+        return await dialog.ShowDialog<KeyboardShortcutAction?>(this);
     }
 }

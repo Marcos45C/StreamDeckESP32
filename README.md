@@ -13,13 +13,14 @@ La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como 
 - Asignación, modificación y eliminación de acciones por botón.
 - Acción **Ejecutar aplicación**, usando la ruta del ejecutable correspondiente al sistema operativo.
 - Acción **Abrir URL**, limitada a direcciones HTTP y HTTPS.
+- Acción **Atajo de teclado** para Linux KDE Wayland: permite seleccionar Ctrl, Alt, Shift o Super y una tecla principal desde el panel de propiedades. La ejecución utiliza la sesión de teclado autorizada mediante XDG RemoteDesktop.
 - Prueba manual de una acción desde la aplicación.
 - Ocho colores configurables por botón, independientes de la acción asignada.
 - Nombre personalizado por botón: doble clic sobre un botón para editarlo o restablecer el nombre predeterminado.
 - Minimización a la bandeja del sistema: la ventana desaparece de la barra de tareas y permanece ejecutándose en segundo plano.
 - Icono propio en la bandeja con opciones para restaurar la ventana o salir de la aplicación.
 - Persistencia local de perfiles en archivos JSON.
-- Modelo y persistencia de acciones de atajo de teclado (`keyboardShortcut`) en el esquema JSON v7. En esta etapa todavía no se envían eventos de teclado: se está incorporando primero la autorización segura de Wayland.
+- Modelo, persistencia y configuración visual de acciones de atajo de teclado (`keyboardShortcut`) en el esquema JSON v7. Los atajos se envían mediante el portal RemoteDesktop después de autorizar el teclado.
 - Compatibilidad de lectura con los esquemas JSON anteriores (v1 a v6); los guardados actuales utilizan el esquema v7.
 - Detección del puerto serie, conexión, handshake y recepción de las nueve pulsaciones físicas.
 - Ejecución de la acción correspondiente al perfil y página seleccionados cuando se pulsa un botón físico.
@@ -211,4 +212,9 @@ Los perfiles pueden respaldarse copiando esa carpeta. Tené presente que las rut
 
 El hardware se mantiene intencionalmente simple: nueve pulsadores conectados al ESP32, sin pantalla, sin LEDs y sin necesidad de una placa distinta. Las mejoras visuales actuales pertenecen al software de escritorio.
 
-No se implementaron todavía instaladores MSI/EXE, actualización automática, sincronización en la nube, macros, combinaciones de teclas ni imágenes personalizadas para los botones.
+No se implementaron todavía instaladores MSI/EXE, actualización automática, sincronización en la nube, macros, soporte de atajos para Windows ni imágenes personalizadas para los botones.
+
+
+## Atajos de teclado en Linux Wayland
+
+La etapa 10.2 solicita autorización de teclado con XDG RemoteDesktop. La etapa 10.3 envía las combinaciones autorizadas mediante `NotifyKeyboardKeysym`, liberando las teclas después de cada combinación. La etapa 10.4 agrega el modal para configurar cada atajo: se pueden elegir los modificadores Ctrl, Alt, Shift y Super, junto con una tecla principal de la lista admitida. La configuración se guarda en el perfil y se muestra también en la cuadrícula de botones.

@@ -1,3 +1,5 @@
+using StreamDeck.Domain.Entities;
+
 namespace StreamDeck.Application.Execution;
 
 /// <summary>
@@ -11,6 +13,8 @@ public interface IKeyboardInputSession : IAsyncDisposable
     event EventHandler? AuthorizationLost;
 
     Task EnsureAuthorizedAsync(CancellationToken cancellationToken = default);
+
+    Task SendShortcutAsync(KeyboardShortcutAction action, CancellationToken cancellationToken = default);
 }
 
 public sealed class KeyboardAuthorizationDeniedException : InvalidOperationException

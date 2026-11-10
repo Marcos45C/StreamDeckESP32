@@ -4,7 +4,7 @@
 
 Esta etapa integra StreamDeckESP32 con el portal estándar `org.freedesktop.portal.RemoteDesktop` para solicitar autorización de teclado en una sesión Linux Wayland.
 
-La aplicación solicita exclusivamente el dispositivo `KEYBOARD` (`types = 1`). No solicita `POINTER` (mouse) ni `TOUCHSCREEN`. Esta etapa solamente gestiona la autorización y el ciclo de vida de la sesión: todavía no envía combinaciones de teclas.
+La aplicación solicita exclusivamente el dispositivo `KEYBOARD` (`types = 1`). No solicita `POINTER` (mouse) ni `TOUCHSCREEN`. La etapa 10.2 gestiona la autorización y el ciclo de vida de la sesión. La etapa 10.3 utiliza esa sesión para enviar combinaciones de teclas mediante los métodos D-Bus Notify del portal. La etapa 10.4 incorpora la configuración de esas combinaciones desde el panel de propiedades de cada botón.
 
 El portal devuelve `session_handle` dentro de `Request.Response` como un valor D-Bus `string` (`s`), aunque su contenido representa una ruta de objeto. La implementación valida esa ruta antes de utilizarla en `SelectDevices` y `Start`.
 
@@ -63,6 +63,30 @@ Si el usuario cancela o deniega la solicitud, la aplicación no marca el teclado
 
 Si el portal no está disponible, no informa versión suficiente o no ofrece teclado, la aplicación informa el motivo y no continúa con la autorización.
 
-## Próxima etapa
+## Configurar un atajo desde la aplicación
 
-Esta etapa no envía teclas. La implementación de eventos mediante `NotifyKeyboardKeysym` o `NotifyKeyboardKeycode`, junto con la asignación de atajos a los botones físicos, queda para etapas posteriores.
+En una sesión Linux Wayland, seleccioná un botón de la cuadrícula. Si no tiene acción, elegí **Atajo de teclado** en el panel de propiedades; si ya tiene una acción, elegí **Cambiar atajo de teclado**.
+
+El diálogo permite seleccionar los modificadores Ctrl, Alt, Shift y Super, además de una tecla principal. Se admiten letras, números, F1–F12 y teclas comunes de navegación y edición. También se puede configurar una tecla sin modificadores. Al guardar, el atajo queda persistido dentro de la acción del botón.
+
+Para ejecutar el atajo, el teclado debe estar autorizado previamente desde el menú del icono de la bandeja. Los atajos se prueban con el botón físico del ESP32 mientras la aplicación de destino está en primer plano; el botón **Probar acción** del panel se oculta para los atajos porque al pulsarlo la propia ventana StreamDeckESP32 tendría el foco.
+
+La configuración de atajos se muestra únicamente cuando la aplicación se inicia dentro de una sesión Linux Wayland. En esta etapa todavía no se ofrece ejecución de atajos en Windows ni en Linux X11.
+
+
+## Etapa 10.3: envío de combinaciones
+
+Una vez autorizada la sesión de teclado, `WaylandKeyboardInputSession.SendShortcutAsync` utiliza `org.freedesktop.portal.RemoteDesktop.NotifyKeyboardKeysym`.
+
+Para cada combinación:
+
+1. Envía los modificadores en orden estable (Ctrl, Alt, Shift, Super).
+2. Presiona la tecla principal.
+3. Libera la tecla principal y luego los modificadores en orden inverso.
+4. Si una llamada falla o se cancela el envío, intenta liberar todas las teclas cuyo evento de pulsación se inició.
+
+Los estados del portal son `1` para pulsado y `0` para liberado. La aplicación usa KeySyms X11 estándar: letras y dígitos ASCII, y KeySyms definidos para teclas especiales y modificadores.
+
+La sesión debe haber sido autorizada previamente desde el menú de la bandeja. La ejecución de un atajo no abre automáticamente el diálogo de permisos. La interfaz para asignar y editar atajos está disponible en la etapa 10.4.
+
+La implementación usa exclusivamente los métodos D-Bus `Notify*` del portal; no llama a `ConnectToEIS` en la misma sesión.

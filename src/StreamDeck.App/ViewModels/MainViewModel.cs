@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StreamDeck.App.Converters;
 using StreamDeck.Application.Device;
 using StreamDeck.Application.Execution;
 using StreamDeck.Application.Profiles;
@@ -85,6 +86,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignKeyboardShortcutCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
@@ -100,6 +102,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(CreatePageCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignKeyboardShortcutCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonColorCommand))]
@@ -112,6 +115,7 @@ public partial class MainViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(MovePageRightCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignKeyboardShortcutCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonColorCommand))]
@@ -120,6 +124,7 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AssignApplicationCommand))]
     [NotifyCanExecuteChangedFor(nameof(AssignUrlCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AssignKeyboardShortcutCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExecuteSelectedButtonActionCommand))]
     [NotifyCanExecuteChangedFor(nameof(ApplyButtonColorCommand))]
@@ -186,6 +191,11 @@ public partial class MainViewModel : ViewModelBase
 
     public Func<string?, Task<string?>>? RequestButtonNameAsync { get; set; }
 
+    public Func<KeyboardShortcutAction?, Task<KeyboardShortcutAction?>>? RequestKeyboardShortcutAsync { get; set; }
+
+    public bool IsKeyboardShortcutSupported { get; } = OperatingSystem.IsLinux()
+        && string.Equals(Environment.GetEnvironmentVariable("XDG_SESSION_TYPE"), "wayland", StringComparison.OrdinalIgnoreCase);
+
     public bool HasSelectedProfile => SelectedProfile is not null;
 
     public string CenterEmptyStateTitle => SelectedProfile is not null
@@ -226,10 +236,19 @@ public partial class MainViewModel : ViewModelBase
     {
         LaunchApplicationAction => "Tipo: Aplicación",
         OpenUrlAction => "Tipo: Abrir URL",
+        KeyboardShortcutAction => "Tipo: Atajo de teclado",
         _ => "Estado: Sin acción asignada",
     };
 
     public bool HasButtonAction => SelectedButtonSlot?.Action is not null;
+
+    // Un atajo debe probarse con el botón físico para enviarlo a la aplicación que tenga el foco.
+    public bool CanTestSelectedButtonAction => SelectedButtonSlot?.Action switch
+    {
+        null => false,
+        KeyboardShortcutAction => false,
+        _ => true,
+    };
 
     public bool HasSelectedButtonColor => SelectedButtonSlot?.ColorHex is not null;
 
@@ -237,6 +256,7 @@ public partial class MainViewModel : ViewModelBase
     {
         LaunchApplicationAction launch => $"Ejecutable: {launch.ApplicationPath}",
         OpenUrlAction openUrl => $"URL: {openUrl.Url}",
+        KeyboardShortcutAction shortcut => $"Atajo: {KeyboardShortcutDisplayFormatter.Format(shortcut)}",
         _ => string.Empty,
     };
 
@@ -579,6 +599,38 @@ public partial class MainViewModel : ViewModelBase
 
     private bool CanAssignOrChangeApplication() =>
         !IsBusy && SelectedProfile is not null && SelectedPage is not null && SelectedButtonSlot is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAssignOrChangeKeyboardShortcut))]
+    private async Task AssignKeyboardShortcutAsync()
+    {
+        if (SelectedProfile is null || SelectedPage is null || SelectedButtonSlot is null ||
+            RequestKeyboardShortcutAsync is null || !IsKeyboardShortcutSupported)
+        {
+            return;
+        }
+
+        var profileId = SelectedProfile.Id;
+        var pageId = SelectedPage.Id;
+        var position = SelectedButtonSlot.Position;
+        var currentShortcut = SelectedButtonSlot.Action as KeyboardShortcutAction;
+        var newShortcut = await RequestKeyboardShortcutAsync(currentShortcut);
+
+        if (newShortcut is null)
+        {
+            return;
+        }
+
+        await RunExclusiveAsync(async () =>
+        {
+            await _profileService.AssignKeyboardShortcutActionAsync(
+                profileId, pageId, position, newShortcut, CancellationToken.None);
+            await RefreshAfterButtonSlotChangeAsync(profileId, pageId, position);
+        }, "No se pudo asignar el atajo de teclado");
+    }
+
+    private bool CanAssignOrChangeKeyboardShortcut() =>
+        IsKeyboardShortcutSupported && !IsBusy && SelectedProfile is not null &&
+        SelectedPage is not null && SelectedButtonSlot is not null;
 
     [RelayCommand(CanExecute = nameof(CanAssignOrChangeApplication))]
     private async Task AssignUrlAsync()
@@ -1065,6 +1117,7 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedButtonSlotColumnText));
         OnPropertyChanged(nameof(SelectedButtonSlotStatusText));
         OnPropertyChanged(nameof(HasButtonAction));
+        OnPropertyChanged(nameof(CanTestSelectedButtonAction));
         OnPropertyChanged(nameof(ConfiguredActionDetailsText));
         OnPropertyChanged(nameof(HasSelectedButtonColor));
 

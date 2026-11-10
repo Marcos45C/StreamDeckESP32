@@ -475,12 +475,18 @@
                                         Command="{Binding AssignUrlCommand}"
                                         Classes="SidebarAction"
                                         HorizontalAlignment="Stretch" />
+                                <Button Content="Atajo de teclado"
+                                        Command="{Binding AssignKeyboardShortcutCommand}"
+                                        Classes="SidebarAction"
+                                        IsVisible="{Binding IsKeyboardShortcutSupported}"
+                                        HorizontalAlignment="Stretch" />
                             </StackPanel>
 
                             <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding HasButtonAction}">
                                 <Button Content="Probar acción"
                                         Command="{Binding ExecuteSelectedButtonActionCommand}"
                                         Classes="SidebarAction"
+                                        IsVisible="{Binding CanTestSelectedButtonAction}"
                                         HorizontalAlignment="Stretch" />
                                 <Button Content="Cambiar aplicación"
                                         Command="{Binding AssignApplicationCommand}"
@@ -489,6 +495,11 @@
                                 <Button Content="Cambiar URL"
                                         Command="{Binding AssignUrlCommand}"
                                         Classes="SidebarAction"
+                                        HorizontalAlignment="Stretch" />
+                                <Button Content="Cambiar atajo de teclado"
+                                        Command="{Binding AssignKeyboardShortcutCommand}"
+                                        Classes="SidebarAction"
+                                        IsVisible="{Binding IsKeyboardShortcutSupported}"
                                         HorizontalAlignment="Stretch" />
                                 <Button Content="Quitar acción"
                                         Command="{Binding ClearButtonActionCommand}"

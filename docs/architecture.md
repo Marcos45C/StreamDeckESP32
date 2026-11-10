@@ -20,9 +20,11 @@ No hay dependencias circulares. `Domain` es la única capa sin dependencias inte
 - `Domain/Entities/ButtonAction.cs`: tipo base de acción.
 - `Domain/Entities/LaunchApplicationAction.cs`: ruta de una aplicación.
 - `Domain/Entities/OpenUrlAction.cs`: URL absoluta HTTP/HTTPS.
-- `Domain/Entities/KeyboardShortcutAction.cs`: combinación de modificadores y tecla principal; en la etapa actual es un modelo persistible, todavía sin envío de eventos.
-- `Application/Execution/IKeyboardInputSession.cs`: contrato de autorización de una sesión de teclado sin dependencias de D-Bus.
-- `Infrastructure/Execution/WaylandKeyboardInputSession.cs`: ciclo de vida de autorización del teclado con XDG RemoteDesktop.
+- `Domain/Entities/KeyboardShortcutAction.cs`: combinación persistible de modificadores y tecla principal.
+- `Application/Execution/IKeyboardInputSession.cs`: contrato de autorización de una sesión de teclado y envío de combinaciones, sin dependencias de D-Bus.
+- `Infrastructure/Execution/WaylandKeyboardInputSession.cs`: ciclo de vida de autorización y envío de KeySyms con XDG RemoteDesktop.
+- `Infrastructure/Execution/KeyboardKeySymMapper.cs`: traducción de los identificadores del dominio a KeySyms X11.
+- `Infrastructure/Execution/KeyboardShortcutSender.cs`: orden de pulsación y liberación de modificadores y tecla principal.
 - `Application/Profiles/ProfileService.cs`: operaciones y persistencia de perfiles, acciones, colores y nombres de botones.
 - `Application/Execution/ButtonActionExecutionService.cs`: resuelve y ejecuta la acción asignada a una posición.
 - `Infrastructure/Persistence/Json/JsonProfileRepository.cs`: lectura y escritura atómica de archivos JSON.
@@ -79,4 +81,4 @@ Cada `ButtonSlot` puede conservar un color hexadecimal y un nombre personalizado
 
 `WaylandKeyboardInputSession` administra la conexión al bus D-Bus de sesión y el ciclo `CreateSession` → `SelectDevices` → `Start` de `org.freedesktop.portal.RemoteDesktop`. Solicita únicamente `KEYBOARD` (`types = 1`) y `persist_mode = 1`, que mantiene el permiso mientras la aplicación está ejecutándose. La implementación observa el cierre de la sesión y la pérdida de la conexión D-Bus.
 
-La etapa 10.2 incorpora la autorización y su ciclo de vida; no implementa todavía `NotifyKeyboardKeysym`, `NotifyKeyboardKeycode` ni el envío de atajos.
+La etapa 10.2 incorpora la autorización y el ciclo de vida de la sesión. La etapa 10.3 implementa el envío de combinaciones mediante `NotifyKeyboardKeysym`; no utiliza `ConnectToEIS`, por lo que mantiene el flujo de entrada D-Bus del portal.
