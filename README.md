@@ -26,16 +26,10 @@ La computadora guarda los perfiles, páginas y acciones. El ESP32 funciona como 
 - Ejecución de la acción correspondiente al perfil y página seleccionados cuando se pulsa un botón físico.
 - Interfaz de escritorio multiplataforma con tema oscuro.
 
-Los nombres y colores son únicamente visuales dentro de la aplicación de escritorio. El hardware actual no tiene pantalla ni LEDs direccionables, y no se necesita agregar componentes para utilizar el proyecto.
-
 ### Bandeja del sistema y ejecución en segundo plano
 
 Al minimizar la ventana, StreamDeck ESP32 oculta su entrada de la barra de tareas y mantiene la aplicación ejecutándose. Para volver a abrirla, hacé clic en el icono de StreamDeck ESP32 de la bandeja del sistema o utilizá la opción **Mostrar StreamDeck ESP32** del menú del icono. La opción **Salir** cierra la aplicación; si el ESP32 está conectado, se realiza primero la desconexión ordenada.
 
-- **Windows:** el icono aparece en el área de notificaciones. Windows decide si lo muestra directamente o dentro del panel de **iconos ocultos**; esa ubicación se puede ajustar desde la configuración de la barra de tareas.
-- **Fedora KDE Plasma:** el icono utiliza la bandeja del sistema de Plasma. En otros escritorios Linux, la disponibilidad depende del soporte de StatusNotifierItem/AppIndicator del entorno de escritorio.
-
-El botón **Cerrar (X)** de la ventana mantiene su comportamiento actual de salida de la aplicación. Para dejarla en segundo plano, utilizá **Minimizar**.
 
 ### Atajos de teclado en Fedora KDE Wayland
 
@@ -187,8 +181,6 @@ El monitor serie puede abrirse con:
 pio device monitor --baud 115200
 ```
 
-No abrir el monitor serie mientras la aplicación de escritorio esté conectada al mismo puerto: normalmente el puerto serie solo puede estar abierto por una aplicación a la vez.
-
 ## Protocolo serie
 
 La comunicación utiliza texto ASCII a 115200 baudios, 8N1. La aplicación envía `HELLO 1`; el ESP32 responde `READY 1 ESP32-WROOM-32 9`. Cada pulsación válida se comunica como `BUTTON N`, donde `N` va de 1 a 9.
@@ -210,7 +202,5 @@ En Linux, la ubicación se determina mediante `Environment.SpecialFolder.Applica
 Los perfiles pueden respaldarse copiando esa carpeta. Tené presente que las rutas de ejecutables son específicas de cada sistema operativo: una ruta configurada en Fedora no necesariamente existe en Windows. Las URLs, los colores y los nombres personalizados no dependen de esas rutas.
 
 ## Alcance actual y próximos pasos
-
-El hardware se mantiene intencionalmente simple: nueve pulsadores conectados al ESP32, sin pantalla, sin LEDs y sin necesidad de una placa distinta. Las mejoras visuales actuales pertenecen al software de escritorio.
 
 No se implementaron todavía instaladores MSI/EXE, actualización automática, sincronización en la nube, macros, soporte de atajos para Windows ni imágenes personalizadas para los botones.
